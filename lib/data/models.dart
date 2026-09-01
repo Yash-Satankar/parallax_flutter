@@ -1070,3 +1070,196 @@ class ExportResponse {
     );
   }
 }
+
+/// GIF Search Result returned by GET /v1/gifs
+class GIFSearchResult {
+  final String id;
+  final String provider; // giphy, tenor, klipy
+  final String title;
+  final String url;
+  final String previewUrl;
+  final int width;
+  final int height;
+  final double duration;
+  final String importRef;
+
+  GIFSearchResult({
+    required this.id,
+    required this.provider,
+    required this.title,
+    required this.url,
+    required this.previewUrl,
+    required this.width,
+    required this.height,
+    this.duration = 0.0,
+    required this.importRef,
+  });
+
+  factory GIFSearchResult.fromJson(Map<String, dynamic> json) {
+    return GIFSearchResult(
+      id: json['id']?.toString() ?? '',
+      provider: json['provider']?.toString() ?? 'giphy',
+      title: json['title']?.toString() ?? json['name']?.toString() ?? 'GIF',
+      url: json['url']?.toString() ?? json['src']?.toString() ?? '',
+      previewUrl: json['preview_url']?.toString() ??
+          json['previewUrl']?.toString() ??
+          json['url']?.toString() ??
+          '',
+      width: (json['width'] as num?)?.toInt() ?? 320,
+      height: (json['height'] as num?)?.toInt() ?? 240,
+      duration: (json['duration'] as num?)?.toDouble() ?? 0.0,
+      importRef: json['import_ref']?.toString() ??
+          json['importRef']?.toString() ??
+          json['url']?.toString() ??
+          '',
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'provider': provider,
+        'title': title,
+        'url': url,
+        'preview_url': previewUrl,
+        'width': width,
+        'height': height,
+        'duration': duration,
+        'import_ref': importRef,
+      };
+}
+
+/// GIF Search Response with pagination
+class GIFSearchResponse {
+  final List<GIFSearchResult> results;
+  final List<String> providers;
+  final int nextOffset;
+  final bool hasMore;
+
+  GIFSearchResponse({
+    required this.results,
+    this.providers = const [],
+    this.nextOffset = 0,
+    this.hasMore = false,
+  });
+
+  factory GIFSearchResponse.fromJson(Map<String, dynamic> json) {
+    final list = (json['results'] as List<dynamic>?)
+            ?.map((r) => GIFSearchResult.fromJson(r as Map<String, dynamic>))
+            .toList() ??
+        [];
+    final provs = (json['providers'] as List<dynamic>?)
+            ?.map((p) => p.toString())
+            .toList() ??
+        [];
+    return GIFSearchResponse(
+      results: list,
+      providers: provs,
+      nextOffset: (json['next_offset'] as num?)?.toInt() ?? 0,
+      hasMore: json['has_more'] == true,
+    );
+  }
+}
+
+/// Predefined Studio Project Presets for Quick Start
+class ProjectPreset {
+  final String id;
+  final String title;
+  final String subtitle;
+  final String aspectRatio;
+  final int width;
+  final int height;
+  final int fps;
+  final String badge;
+  final String iconName;
+
+  const ProjectPreset({
+    required this.id,
+    required this.title,
+    required this.subtitle,
+    required this.aspectRatio,
+    required this.width,
+    required this.height,
+    required this.fps,
+    required this.badge,
+    required this.iconName,
+  });
+
+  static const List<ProjectPreset> presets = [
+    ProjectPreset(
+      id: 'cinema_4k',
+      title: '4K Cinema',
+      subtitle: '3840×2160 • 24 FPS • 16:9',
+      aspectRatio: '16:9',
+      width: 3840,
+      height: 2160,
+      fps: 24,
+      badge: 'CINEMA UHD',
+      iconName: 'movie',
+    ),
+    ProjectPreset(
+      id: 'social_reels',
+      title: 'Reels & Shorts',
+      subtitle: '1080×1920 • 60 FPS • 9:16',
+      aspectRatio: '9:16',
+      width: 1080,
+      height: 1920,
+      fps: 60,
+      badge: 'VERTICAL PRO',
+      iconName: 'smartphone',
+    ),
+    ProjectPreset(
+      id: 'podcast_square',
+      title: 'Podcast & Audio',
+      subtitle: '1080×1080 • 30 FPS • 1:1',
+      aspectRatio: '1:1',
+      width: 1080,
+      height: 1080,
+      fps: 30,
+      badge: 'SQUARE 1:1',
+      iconName: 'mic',
+    ),
+    ProjectPreset(
+      id: 'social_portrait',
+      title: 'Social Promo',
+      subtitle: '1080×1350 • 30 FPS • 4:5',
+      aspectRatio: '4:5',
+      width: 1080,
+      height: 1350,
+      fps: 30,
+      badge: 'FEED 4:5',
+      iconName: 'video_library',
+    ),
+  ];
+}
+
+/// Helper formatting utilities for file sizes, timestamps, and timecodes
+class FormatUtils {
+  static String formatBytes(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
+  }
+
+  static String formatTimecode(double seconds) {
+    final mins = (seconds / 60).floor();
+    final secs = (seconds % 60).floor();
+    final ms = ((seconds - secs) * 100).floor();
+    return '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}.${ms.toString().padLeft(2, '0')}';
+  }
+
+  static String formatRelativeTime(DateTime date) {
+    final now = DateTime.now();
+    final diff = now.difference(date);
+
+    if (diff.inSeconds < 45) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays == 1) return 'Yesterday';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    return '${date.day}/${date.month}/${date.year}';
+  }
+}
+

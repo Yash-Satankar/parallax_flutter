@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:parallax_mobile/blocs/health/health_bloc.dart';
 import 'package:parallax_mobile/blocs/health/health_event.dart';
 import 'package:parallax_mobile/blocs/health/health_state.dart';
@@ -13,7 +12,7 @@ import 'package:parallax_mobile/config/theme.dart';
 import 'package:parallax_mobile/data/models.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -29,7 +28,7 @@ class _HomeScreenState extends State<HomeScreen> {
     '4K Cinema',
     'Social 9:16',
     'Audio Masters',
-    'Drafts'
+    'Drafts',
   ];
 
   @override
@@ -183,15 +182,15 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Hero Recent Project Showcase Banner
+              // Hero Overview Banner
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
-                  gradient: AppTheme.darkCardGradient,
+                  gradient: AppTheme.heroBannerGradient,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppTheme.borderSubtle),
-                  boxShadow: AppTheme.shadowSm,
+                  border: Border.all(color: AppTheme.borderSubtleGlow, width: 1.2),
+                  boxShadow: AppTheme.shadowGlowPrimary,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -211,18 +210,25 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const Spacer(),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
                             color: AppTheme.surfaceDark2,
                             borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: AppTheme.borderSubtle),
                           ),
-                          child: Text(
-                            serverUrl,
-                            style: const TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 9,
-                              color: Color(0xFF94A3B8),
-                            ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.dns_outlined, size: 10, color: AppTheme.cyan),
+                              const SizedBox(width: 4),
+                              Text(
+                                serverUrl,
+                                style: const TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 9,
+                                  color: Color(0xFF94A3B8),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -234,15 +240,15 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Direct the AI editor in natural language to cut footage, snap beat drops, analyze transcripts, and export 4K sequences.',
-                      style: AppTheme.bodyMd.copyWith(color: const Color(0xFF94A3B8)),
+                      'Direct the AI editor in natural language to cut footage, snap beat drops, search speech transcripts, and export master sequences.',
+                      style: AppTheme.bodyMd.copyWith(color: const Color(0xFFCBD5E1)),
                     ),
                     const SizedBox(height: 16),
                     Row(
                       children: [
                         FilledButton.icon(
                           icon: const Icon(Icons.add, size: 16),
-                          label: const Text('New Project'),
+                          label: const Text('New Sequence'),
                           style: FilledButton.styleFrom(
                             backgroundColor: AppTheme.primary,
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
@@ -253,7 +259,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(width: 10),
                         OutlinedButton.icon(
                           icon: const Icon(Icons.tune, size: 16),
-                          label: const Text('Configure Engine'),
+                          label: const Text('Engine Settings'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: Colors.white,
                             side: const BorderSide(color: AppTheme.borderSubtle),
@@ -265,6 +271,75 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     ),
                   ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // 1-Tap Quick Start Presets Carousel
+              Text(
+                'QUICK START TEMPLATES',
+                style: AppTheme.labelSm.copyWith(color: AppTheme.cyan, letterSpacing: 0.8),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 86,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: ProjectPreset.presets.length,
+                  itemBuilder: (context, index) {
+                    final preset = ProjectPreset.presets[index];
+                    return GestureDetector(
+                      onTap: () => _showCreateProjectModal(context, preselectedPreset: preset),
+                      child: Container(
+                        width: 156,
+                        margin: const EdgeInsets.only(right: 10),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppTheme.cardDark,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppTheme.borderSubtle),
+                          boxShadow: AppTheme.shadowSm,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.primary.withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    preset.badge,
+                                    style: AppTheme.labelSm.copyWith(color: AppTheme.cyan, fontSize: 8),
+                                  ),
+                                ),
+                                const Spacer(),
+                                const Icon(Icons.arrow_forward, size: 12, color: Color(0xFF64748B)),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              preset.title,
+                              style: AppTheme.headingSm.copyWith(fontSize: 12),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              preset.subtitle,
+                              style: AppTheme.bodySm.copyWith(fontSize: 9, color: const Color(0xFF94A3B8)),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
 
@@ -303,7 +378,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       onTap: () => setState(() => _selectedFilterIndex = index),
                       child: Container(
                         margin: const EdgeInsets.only(right: 8),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                         decoration: BoxDecoration(
                           color: isSelected ? AppTheme.primary : AppTheme.surfaceDark2,
                           borderRadius: BorderRadius.circular(20),
@@ -351,7 +426,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   } else if (state is ProjectsError) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        backgroundColor: AppTheme.cardDark,
+                        backgroundColor: AppTheme.cardElevated,
                         content: Text(state.message, style: const TextStyle(color: AppTheme.error)),
                       ),
                     );
@@ -375,7 +450,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           children: [
                             const Icon(Icons.cloud_off, size: 48, color: AppTheme.error),
                             const SizedBox(height: 12),
-                            Text('Backend Connection Offline', style: AppTheme.headingSm),
+                            const Text('Backend Connection Offline', style: AppTheme.headingSm),
                             const SizedBox(height: 4),
                             Text(
                               state.message,
@@ -416,11 +491,24 @@ class _HomeScreenState extends State<HomeScreen> {
                         padding: const EdgeInsets.all(32),
                         child: Column(
                           children: [
-                            const Icon(Icons.movie_filter_outlined, size: 48, color: Colors.grey),
-                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.all(18),
+                              decoration: BoxDecoration(
+                                color: AppTheme.surfaceDark2,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: AppTheme.borderSubtle),
+                              ),
+                              child: const Icon(Icons.movie_filter_outlined, size: 36, color: AppTheme.cyan),
+                            ),
+                            const SizedBox(height: 14),
                             Text(
                               _searchQuery.isEmpty ? 'No studio projects yet' : 'No matching projects',
                               style: AppTheme.headingSm,
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Create a new sequence or start from a preset template.',
+                              style: AppTheme.bodySm.copyWith(color: const Color(0xFF94A3B8)),
                             ),
                             const SizedBox(height: 16),
                             FilledButton.icon(
@@ -441,7 +529,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       crossAxisCount: 2,
                       mainAxisSpacing: 14,
                       crossAxisSpacing: 14,
-                      childAspectRatio: 0.82,
+                      childAspectRatio: 0.84,
                     ),
                     itemCount: filtered.length,
                     itemBuilder: (context, index) {
@@ -457,10 +545,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _showCreateProjectModal(BuildContext context) {
-    final controller = TextEditingController();
-    String selectedPreset = '16:9';
-    int selectedFps = 30;
+  void _showCreateProjectModal(BuildContext context, {ProjectPreset? preselectedPreset}) {
+    final controller = TextEditingController(
+      text: preselectedPreset != null ? '${preselectedPreset.title} Project' : '',
+    );
+    String selectedRatio = preselectedPreset?.aspectRatio ?? '16:9';
+    int selectedFps = preselectedPreset?.fps ?? 30;
 
     showModalBottomSheet(
       context: context,
@@ -470,7 +560,7 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (context, setModalState) {
           return Container(
             decoration: const BoxDecoration(
-              color: AppTheme.cardDark,
+              color: AppTheme.cardElevated,
               borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               border: Border(top: BorderSide(color: AppTheme.borderSubtle)),
             ),
@@ -535,22 +625,29 @@ class _HomeScreenState extends State<HomeScreen> {
                     _buildPresetOption(
                       title: '16:9 YouTube',
                       ratio: '16:9',
-                      isSelected: selectedPreset == '16:9',
-                      onTap: () => setModalState(() => selectedPreset = '16:9'),
+                      isSelected: selectedRatio == '16:9',
+                      onTap: () => setModalState(() => selectedRatio = '16:9'),
                     ),
                     const SizedBox(width: 8),
                     _buildPresetOption(
                       title: '9:16 Reel/Short',
                       ratio: '9:16',
-                      isSelected: selectedPreset == '9:16',
-                      onTap: () => setModalState(() => selectedPreset = '9:16'),
+                      isSelected: selectedRatio == '9:16',
+                      onTap: () => setModalState(() => selectedRatio = '9:16'),
                     ),
                     const SizedBox(width: 8),
                     _buildPresetOption(
-                      title: '2.39:1 Cinema',
-                      ratio: '2.39:1',
-                      isSelected: selectedPreset == '2.39:1',
-                      onTap: () => setModalState(() => selectedPreset = '2.39:1'),
+                      title: '1:1 Square',
+                      ratio: '1:1',
+                      isSelected: selectedRatio == '1:1',
+                      onTap: () => setModalState(() => selectedRatio = '1:1'),
+                    ),
+                    const SizedBox(width: 8),
+                    _buildPresetOption(
+                      title: '4:5 Social',
+                      ratio: '4:5',
+                      isSelected: selectedRatio == '4:5',
+                      onTap: () => setModalState(() => selectedRatio = '4:5'),
                     ),
                   ],
                 ),
@@ -620,7 +717,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
           decoration: BoxDecoration(
             color: isSelected ? AppTheme.primary.withValues(alpha: 0.2) : AppTheme.surfaceDark2,
             borderRadius: BorderRadius.circular(10),
@@ -635,14 +732,16 @@ class _HomeScreenState extends State<HomeScreen> {
               Text(
                 ratio,
                 style: AppTheme.headingSm.copyWith(
-                  fontSize: 12,
+                  fontSize: 11,
                   color: isSelected ? AppTheme.cyan : Colors.white,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 title.split(' ').last,
-                style: AppTheme.bodySm.copyWith(fontSize: 9),
+                style: AppTheme.bodySm.copyWith(fontSize: 8),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
@@ -654,11 +753,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
 class _ProProjectCard extends StatelessWidget {
   final ProjectRecord project;
-  const _ProProjectCard({Key? key, required this.project}) : super(key: key);
+
+  const _ProProjectCard({required this.project});
 
   @override
   Widget build(BuildContext context) {
-    final dateStr = DateFormat('MMM d, y').format(project.createdAt);
+    final relativeDate = FormatUtils.formatRelativeTime(project.createdAt);
 
     return Container(
       decoration: BoxDecoration(
@@ -673,7 +773,7 @@ class _ProProjectCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Thumbnail Preview Container (16:9 aspect header)
+            // Thumbnail Preview Container
             Expanded(
               child: Container(
                 width: double.infinity,
@@ -713,7 +813,7 @@ class _ProProjectCard extends StatelessWidget {
                           border: Border.all(color: AppTheme.cyan.withValues(alpha: 0.4)),
                         ),
                         child: Text(
-                          '4K 30FPS',
+                          'STUDIO NLE',
                           style: AppTheme.monospaceCode.copyWith(fontSize: 8),
                         ),
                       ),
@@ -772,7 +872,7 @@ class _ProProjectCard extends StatelessWidget {
                       ),
                       const Spacer(),
                       Text(
-                        dateStr,
+                        relativeDate,
                         style: AppTheme.bodySm.copyWith(fontSize: 9, color: const Color(0xFF64748B)),
                       ),
                     ],

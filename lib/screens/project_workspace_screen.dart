@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ui' as ui;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -29,16 +30,16 @@ import 'package:parallax_mobile/widgets/director_trace_card.dart';
 import 'package:parallax_mobile/widgets/media_preview_modal.dart';
 import 'package:parallax_mobile/widgets/timeline_track_view.dart';
 
-/// Pro Studio Project Workspace Screen housing Director AI, Media Bin, Timeline, History, & Export
+/// Pro Studio Project Workspace Screen housing Director AI, Media Bin with GIF Search, Timeline, History, & Export
 class ProjectWorkspaceScreen extends StatefulWidget {
   final String projectId;
   final int initialTab;
 
   const ProjectWorkspaceScreen({
-    Key? key,
+    super.key,
     required this.projectId,
     this.initialTab = 0,
-  }) : super(key: key);
+  });
 
   @override
   State<ProjectWorkspaceScreen> createState() => _ProjectWorkspaceScreenState();
@@ -48,7 +49,13 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
   late int _currentTab;
   final TextEditingController _chatInputController = TextEditingController();
   final TextEditingController _mediaSearchController = TextEditingController();
+  final TextEditingController _gifSearchController = TextEditingController();
   final ImagePicker _picker = ImagePicker();
+
+  int _selectedMediaTab = 0; // 0: All, 1: Videos, 2: Audio, 3: Stills, 4: GIFs
+  List<GIFSearchResult> _gifResults = [];
+  bool _isSearchingGifs = false;
+  String? _importingGifRef;
 
   final List<String> _quickPrompts = [
     '✨ Cut on beat drop at 12.0s',
@@ -68,7 +75,52 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
   void dispose() {
     _chatInputController.dispose();
     _mediaSearchController.dispose();
+    _gifSearchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _searchGifs(String query) async {
+    if (query.trim().isEmpty) return;
+    setState(() => _isSearchingGifs = true);
+
+    try {
+      final api = context.read<MediaBloc>().api;
+      final response = await api.searchGifs(query.trim());
+      if (mounted) {
+        setState(() {
+          _gifResults = response.results;
+          _isSearchingGifs = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isSearchingGifs = false);
+      }
+    }
+  }
+
+  Future<void> _importGif(GIFSearchResult gif) async {
+    setState(() => _importingGifRef = gif.importRef);
+    try {
+      final api = context.read<MediaBloc>().api;
+      await api.importGif(widget.projectId, gif.importRef);
+      if (mounted) {
+        context.read<MediaBloc>().add(const MediaLoadRequested());
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Imported "${gif.title}" to project media')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to import GIF: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _importingGifRef = null);
+      }
+    }
   }
 
   @override
@@ -120,14 +172,19 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
           IconButton(
             icon: const Icon(Icons.refresh, size: 18, color: Color(0xFFCBD5E1)),
             onPressed: () {
-              context.read<ProjectDetailBloc>().add(const ProjectDetailRefreshRequested());
+              context
+                  .read<ProjectDetailBloc>()
+                  .add(const ProjectDetailRefreshRequested());
               context.read<MediaBloc>().add(const MediaLoadRequested());
-              context.read<TimelineBloc>().add(const TimelineRefreshRequested());
+              context
+                  .read<TimelineBloc>()
+                  .add(const TimelineRefreshRequested());
               context.read<HistoryBloc>().add(const HistoryLoadRequested());
             },
           ),
           IconButton(
-            icon: const Icon(Icons.settings_outlined, size: 18, color: Color(0xFFCBD5E1)),
+            icon: const Icon(Icons.settings_outlined,
+                size: 18, color: Color(0xFFCBD5E1)),
             onPressed: () => context.push('/settings'),
           ),
         ],
@@ -153,8 +210,10 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
           backgroundColor: Colors.transparent,
           selectedItemColor: AppTheme.primary,
           unselectedItemColor: const Color(0xFF64748B),
-          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 10),
-          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 10),
+          selectedLabelStyle:
+              const TextStyle(fontWeight: FontWeight.w700, fontSize: 10),
+          unselectedLabelStyle:
+              const TextStyle(fontWeight: FontWeight.w500, fontSize: 10),
           items: const [
             BottomNavigationBarItem(
               icon: Icon(Icons.psychology_outlined),
@@ -201,12 +260,14 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: const BoxDecoration(
                 color: AppTheme.surfaceDark,
-                border: Border(bottom: BorderSide(color: AppTheme.borderSubtle)),
+                border:
+                    Border(bottom: BorderSide(color: AppTheme.borderSubtle)),
               ),
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: AppTheme.surfaceDark2,
                       borderRadius: BorderRadius.circular(8),
@@ -215,11 +276,13 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.chat_bubble_outline, size: 12, color: AppTheme.cyan),
+                        const Icon(Icons.chat_bubble_outline,
+                            size: 12, color: AppTheme.cyan),
                         const SizedBox(width: 6),
                         Text(
                           'Director Assistant',
-                          style: AppTheme.labelSm.copyWith(color: Colors.white, fontSize: 10),
+                          style: AppTheme.labelSm
+                              .copyWith(color: Colors.white, fontSize: 10),
                         ),
                       ],
                     ),
@@ -227,7 +290,8 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
                   const Spacer(),
                   // Thinking Effort Toggle
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
                       color: AppTheme.surfaceDark2,
                       borderRadius: BorderRadius.circular(8),
@@ -235,22 +299,29 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.bolt, size: 13, color: AppTheme.warning),
+                        const Icon(Icons.bolt,
+                            size: 13, color: AppTheme.warning),
                         const SizedBox(width: 4),
                         DropdownButton<String>(
                           value: chatState.thinkingEffort,
                           underline: const SizedBox.shrink(),
                           isDense: true,
                           dropdownColor: AppTheme.cardDark,
-                          style: AppTheme.labelSm.copyWith(color: Colors.white, fontSize: 10),
+                          style: AppTheme.labelSm
+                              .copyWith(color: Colors.white, fontSize: 10),
                           items: const [
-                            DropdownMenuItem(value: 'low', child: Text('Flash (Fast)')),
-                            DropdownMenuItem(value: 'medium', child: Text('Medium')),
-                            DropdownMenuItem(value: 'high', child: Text('Deep Reasoning')),
+                            DropdownMenuItem(
+                                value: 'low', child: Text('Flash (Fast)')),
+                            DropdownMenuItem(
+                                value: 'medium', child: Text('Medium')),
+                            DropdownMenuItem(
+                                value: 'high', child: Text('Deep Reasoning')),
                           ],
                           onChanged: (val) {
                             if (val != null) {
-                              context.read<DirectorBloc>().add(DirectorSetThinkingEffort(val));
+                              context
+                                  .read<DirectorBloc>()
+                                  .add(DirectorSetThinkingEffort(val));
                             }
                           },
                         ),
@@ -261,39 +332,42 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
               ),
             ),
 
-            // Message List
+            // Messages Viewport
             Expanded(
               child: chatState.messages.isEmpty && !chatState.isStreaming
                   ? _buildChatEmptyState()
                   : ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: chatState.messages.length + (chatState.isStreaming ? 1 : 0),
+                      padding: const EdgeInsets.all(14),
+                      itemCount: chatState.messages.length +
+                          (chatState.isStreaming ? 1 : 0),
                       itemBuilder: (context, index) {
-                        if (index == chatState.messages.length && chatState.isStreaming) {
-                          return _buildStreamingMessageItem(chatState);
+                        if (index < chatState.messages.length) {
+                          return _buildMessageItem(chatState.messages[index]);
                         }
-                        return _buildMessageItem(chatState.messages[index]);
+                        return _buildStreamingMessageItem(chatState);
                       },
                     ),
             ),
 
-            // Quick Prompt Suggestions Carousel
+            // Quick Prompt Suggestion Strip
             Container(
               height: 38,
               padding: const EdgeInsets.symmetric(vertical: 4),
               color: AppTheme.surfaceDark,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
                 itemCount: _quickPrompts.length,
                 itemBuilder: (context, index) {
                   return GestureDetector(
                     onTap: () {
-                      _chatInputController.text = _quickPrompts[index].replaceFirst(RegExp(r'^[^\w]+'), '').trim();
+                      _chatInputController.text = _quickPrompts[index]
+                          .replaceFirst(RegExp(r'^[^\s]+\s'), '');
                     },
                     child: Container(
                       margin: const EdgeInsets.only(right: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
                         color: AppTheme.surfaceDark2,
                         borderRadius: BorderRadius.circular(16),
@@ -316,16 +390,19 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
             // Error banner
             if (chatState.error != null)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 color: AppTheme.error.withValues(alpha: 0.15),
                 child: Row(
                   children: [
-                    const Icon(Icons.error_outline, size: 16, color: AppTheme.error),
+                    const Icon(Icons.error_outline,
+                        size: 16, color: AppTheme.error),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         chatState.error!,
-                        style: const TextStyle(color: AppTheme.error, fontSize: 12),
+                        style: const TextStyle(
+                            color: AppTheme.error, fontSize: 12),
                       ),
                     ),
                   ],
@@ -336,7 +413,8 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
             if (chatState.stagedImages.isNotEmpty)
               Container(
                 height: 64,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                 color: AppTheme.surfaceDark,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
@@ -362,13 +440,16 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
                           top: 0,
                           right: 8,
                           child: GestureDetector(
-                            onTap: () => context.read<DirectorBloc>().add(DirectorRemoveImage(index)),
+                            onTap: () => context
+                                .read<DirectorBloc>()
+                                .add(DirectorRemoveImage(index)),
                             child: Container(
                               decoration: const BoxDecoration(
                                 color: Colors.black54,
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.close, size: 12, color: Colors.white),
+                              child: const Icon(Icons.close,
+                                  size: 12, color: Colors.white),
                             ),
                           ),
                         ),
@@ -388,8 +469,9 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.add_photo_alternate_outlined, color: AppTheme.cyan, size: 22),
-                    onPressed: () => _pickChatImage(context),
+                    icon: const Icon(Icons.add_photo_alternate_outlined,
+                        color: AppTheme.cyan, size: 22),
+                    onPressed: () => _pickChatImage(),
                   ),
                   Expanded(
                     child: TextField(
@@ -398,31 +480,38 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
                       minLines: 1,
                       decoration: const InputDecoration(
                         hintText: 'Ask Director to edit, search, or grade...',
-                        contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
                   chatState.isStreaming
                       ? IconButton(
-                          icon: const Icon(Icons.stop_circle, color: AppTheme.error, size: 30),
-                          onPressed: () => context.read<DirectorBloc>().add(const DirectorCancelStream()),
+                          icon: const Icon(Icons.stop_circle,
+                              color: AppTheme.error, size: 30),
+                          onPressed: () => context
+                              .read<DirectorBloc>()
+                              .add(const DirectorCancelStream()),
                         )
                       : Container(
-                          decoration: BoxDecoration(
+                          decoration: const BoxDecoration(
                             gradient: AppTheme.primaryGradient,
                             shape: BoxShape.circle,
                             boxShadow: AppTheme.shadowGlowPrimary,
                           ),
                           child: IconButton(
-                            icon: const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 20),
+                            icon: const Icon(Icons.arrow_upward_rounded,
+                                color: Colors.white, size: 20),
                             onPressed: () {
                               final text = _chatInputController.text.trim();
-                              if (text.isNotEmpty || chatState.stagedImages.isNotEmpty) {
+                              if (text.isNotEmpty ||
+                                  chatState.stagedImages.isNotEmpty) {
                                 context.read<DirectorBloc>().add(
                                       DirectorSendMessage(
                                         text,
-                                        images: chatState.stagedImages.isNotEmpty
+                                        images: chatState
+                                                .stagedImages.isNotEmpty
                                             ? List.from(chatState.stagedImages)
                                             : null,
                                       ),
@@ -448,7 +537,7 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
         children: [
           Container(
             padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               gradient: AppTheme.primaryGradient,
               shape: BoxShape.circle,
               boxShadow: AppTheme.shadowGlowPrimary,
@@ -525,11 +614,13 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
               const SizedBox(height: 6),
               Row(
                 children: [
-                  const Icon(Icons.account_tree_outlined, size: 12, color: AppTheme.cyan),
+                  const Icon(Icons.account_tree_outlined,
+                      size: 12, color: AppTheme.cyan),
                   const SizedBox(width: 4),
                   Text(
                     'EXECUTION TRACE (${message.trace!.length} steps)',
-                    style: AppTheme.labelSm.copyWith(color: AppTheme.cyan, fontSize: 9),
+                    style: AppTheme.labelSm
+                        .copyWith(color: AppTheme.cyan, fontSize: 9),
                   ),
                 ],
               ),
@@ -540,7 +631,8 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
               const SizedBox(height: 6),
               Text(
                 'Elapsed: ${(message.workedMs! / 1000).toStringAsFixed(1)}s',
-                style: AppTheme.bodySm.copyWith(fontSize: 9, color: const Color(0xFF64748B)),
+                style: AppTheme.bodySm
+                    .copyWith(fontSize: 9, color: const Color(0xFF64748B)),
               ),
             ],
           ],
@@ -572,12 +664,14 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
                 const SizedBox(
                   width: 12,
                   height: 12,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.cyan),
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: AppTheme.cyan),
                 ),
                 const SizedBox(width: 8),
                 Text(
                   'Director is responding...',
-                  style: AppTheme.labelSm.copyWith(color: AppTheme.cyan, fontSize: 10),
+                  style: AppTheme.labelSm
+                      .copyWith(color: AppTheme.cyan, fontSize: 10),
                 ),
               ],
             ),
@@ -592,7 +686,8 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
               const SizedBox(height: 10),
               const Divider(height: 1, color: AppTheme.borderSubtle),
               const SizedBox(height: 6),
-              ...state.currentTrace.map((act) => DirectorTraceCard(activity: act)),
+              ...state.currentTrace
+                  .map((act) => DirectorTraceCard(activity: act)),
             ],
           ],
         ),
@@ -600,30 +695,31 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
     );
   }
 
-  Future<void> _pickChatImage(BuildContext context) async {
+  Future<void> _pickChatImage() async {
     final picked = await _picker.pickImage(source: ImageSource.gallery);
-    if (picked != null && mounted) {
-      final bytes = await picked.readAsBytes();
-      final base64String = 'data:image/jpeg;base64,${base64Encode(bytes)}';
-      context.read<DirectorBloc>().add(
-            DirectorAddImage(ChatImage(
-              name: picked.name,
-              mime: 'image/jpeg',
-              url: picked.path,
-              data: base64String,
-            )),
-          );
-    }
+    if (picked == null || !mounted) return;
+    final bytes = await picked.readAsBytes();
+    final base64String = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+    if (!mounted) return;
+    context.read<DirectorBloc>().add(
+          DirectorAddImage(ChatImage(
+            name: picked.name,
+            mime: 'image/jpeg',
+            url: picked.path,
+            data: base64String,
+          )),
+        );
   }
 
   // =============================================================
-  // TAB 1: Media Bin & Semantic Search
+  // TAB 1: Media Bin & Semantic Search & Integrated GIF Hub
   // =============================================================
 
   Widget _buildMediaBinTab() {
     return BlocBuilder<MediaBloc, MediaState>(
       builder: (context, mediaState) {
-        final isSearching = mediaState is MediaLoaded && mediaState.searchQuery.isNotEmpty;
+        final isSearching =
+            mediaState is MediaLoaded && mediaState.searchQuery.isNotEmpty;
         final assets = mediaState is MediaLoaded
             ? mediaState.assets
             : mediaState is MediaUploading
@@ -631,184 +727,397 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
                 : mediaState is MediaError
                     ? mediaState.existingAssets
                     : <MediaAsset>[];
-        final searchHits = mediaState is MediaLoaded ? mediaState.searchHits : <MediaSearchHit>[];
+        final searchHits = mediaState is MediaLoaded
+            ? mediaState.searchHits
+            : <MediaSearchHit>[];
         final searching = mediaState is MediaLoaded && mediaState.isSearching;
+
+        final filteredAssets = _selectedMediaTab == 0
+            ? assets
+            : _selectedMediaTab == 1
+                ? assets.where((a) => a.kind == 'video').toList()
+                : _selectedMediaTab == 2
+                    ? assets.where((a) => a.kind == 'audio').toList()
+                    : _selectedMediaTab == 3
+                        ? assets.where((a) => a.kind == 'image').toList()
+                        : assets;
 
         return SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Search & Upload Bar
+              // Media Category Filter Pills
               Row(
                 children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _mediaSearchController,
-                      decoration: InputDecoration(
-                        hintText: 'Semantic search (speech, scenes, captions)...',
-                        prefixIcon: const Icon(Icons.search, size: 18, color: Color(0xFF94A3B8)),
-                        suffixIcon: isSearching
-                            ? IconButton(
-                                icon: const Icon(Icons.clear, size: 16),
-                                onPressed: () {
-                                  _mediaSearchController.clear();
-                                  context.read<MediaBloc>().add(const MediaSearchCleared());
-                                },
-                              )
-                            : null,
-                      ),
-                      onSubmitted: (val) {
-                        if (val.trim().isNotEmpty) {
-                          context.read<MediaBloc>().add(MediaSearchRequested(val.trim()));
-                        }
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  FilledButton.icon(
-                    icon: mediaState is MediaUploading
-                        ? const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
-                        : const Icon(Icons.upload_file, size: 16),
-                    label: const Text('Upload'),
-                    onPressed: mediaState is MediaUploading ? null : () => _showUploadPicker(context),
-                  ),
+                  _buildMediaCategoryChip('All (${assets.length})', 0),
+                  const SizedBox(width: 6),
+                  _buildMediaCategoryChip('Video', 1),
+                  const SizedBox(width: 6),
+                  _buildMediaCategoryChip('Audio', 2),
+                  const SizedBox(width: 6),
+                  _buildMediaCategoryChip('Stills', 3),
+                  const SizedBox(width: 6),
+                  _buildMediaCategoryChip('GIFs Hub', 4),
                 ],
               ),
+              const SizedBox(height: 14),
 
-              const SizedBox(height: 16),
-
-              // Upload error banner
-              if (mediaState is MediaError) ...[
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(
-                    color: AppTheme.error.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(mediaState.message,
-                      style: const TextStyle(color: AppTheme.error, fontSize: 11)),
+              if (_selectedMediaTab == 4) ...[
+                // Integrated GIF Search View
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _gifSearchController,
+                        decoration: const InputDecoration(
+                          hintText: 'Search Giphy, Tenor & Klipy GIFs...',
+                          prefixIcon: Icon(Icons.gif_box_outlined,
+                              size: 20, color: AppTheme.cyan),
+                        ),
+                        onSubmitted: (val) => _searchGifs(val),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    FilledButton(
+                      onPressed: () => _searchGifs(_gifSearchController.text),
+                      child: const Text('Search'),
+                    ),
+                  ],
                 ),
-              ],
-
-              // Search Results
-              if (isSearching) ...[
-                Text('SEMANTIC MATCHES',
-                    style: AppTheme.labelSm.copyWith(color: AppTheme.cyan, letterSpacing: 0.8)),
-                const SizedBox(height: 8),
-                if (searching)
-                  const Center(child: CircularProgressIndicator(color: AppTheme.cyan))
-                else if (searchHits.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text('No semantic matches found for your query.'),
+                const SizedBox(height: 14),
+                if (_isSearchingGifs)
+                  const Center(
+                      child: Padding(
+                          padding: EdgeInsets.all(24),
+                          child:
+                              CircularProgressIndicator(color: AppTheme.cyan)))
+                else if (_gifResults.isEmpty)
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        children: [
+                          const Icon(Icons.gif_box,
+                              size: 48, color: Colors.grey),
+                          const SizedBox(height: 12),
+                          const Text('Search millions of online GIFs',
+                              style: AppTheme.headingSm),
+                          const SizedBox(height: 4),
+                          Text(
+                              'Import funny reactions, overlays, and meme clips directly into your project.',
+                              style: AppTheme.bodySm
+                                  .copyWith(color: const Color(0xFF94A3B8)),
+                              textAlign: TextAlign.center),
+                        ],
+                      ),
+                    ),
                   )
                 else
-                  ListView.builder(
+                  GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    itemCount: searchHits.length,
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      mainAxisSpacing: 12,
+                      crossAxisSpacing: 12,
+                      childAspectRatio: 0.92,
+                    ),
+                    itemCount: _gifResults.length,
                     itemBuilder: (context, index) {
-                      final hit = searchHits[index];
+                      final gif = _gifResults[index];
+                      final isImporting = _importingGifRef == gif.importRef;
+
                       return Container(
-                        margin: const EdgeInsets.symmetric(vertical: 4),
                         decoration: BoxDecoration(
                           color: AppTheme.cardDark,
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(14),
                           border: Border.all(color: AppTheme.borderSubtle),
                         ),
-                        child: ListTile(
-                          leading: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: AppTheme.cyan.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(8),
+                        clipBehavior: ui.Clip.antiAlias,
+                        child: Column(
+                          children: [
+                            Expanded(
+                              child: CachedNetworkImage(
+                                imageUrl: gif.previewUrl,
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                                placeholder: (_, __) => const Center(
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2)),
+                                errorWidget: (_, __, ___) =>
+                                    const Center(child: Icon(Icons.image)),
+                              ),
                             ),
-                            child: const Icon(Icons.subtitles, size: 18, color: AppTheme.cyan),
-                          ),
-                          title: Text(hit.name ?? hit.path ?? 'Media',
-                              style: AppTheme.headingSm.copyWith(fontSize: 12)),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (hit.spokenEn != null || hit.textEn != null)
-                                Text(
-                                  '"${hit.spokenEn ?? hit.textEn}"',
-                                  style: AppTheme.bodySm.copyWith(color: Colors.white70),
-                                ),
-                              if (hit.start != null)
-                                Text(
-                                  'Time: ${hit.start!.toStringAsFixed(1)}s - ${hit.end?.toStringAsFixed(1)}s',
-                                  style: AppTheme.monospaceCode.copyWith(fontSize: 9),
-                                ),
-                            ],
-                          ),
-                          trailing: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppTheme.primary.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 6),
+                              color: AppTheme.surfaceDark,
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      gif.title,
+                                      style: AppTheme.headingSm
+                                          .copyWith(fontSize: 10),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  InkWell(
+                                    onTap: isImporting
+                                        ? null
+                                        : () => _importGif(gif),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        gradient: AppTheme.primaryGradient,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: isImporting
+                                          ? const SizedBox(
+                                              width: 10,
+                                              height: 10,
+                                              child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  color: Colors.white))
+                                          : const Text('Import',
+                                              style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.w700)),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                            child: Text(
-                              '${(hit.score * 100).toInt()}% match',
-                              style: AppTheme.labelSm.copyWith(color: AppTheme.primary, fontSize: 9),
-                            ),
-                          ),
+                          ],
                         ),
                       );
                     },
                   ),
-                const SizedBox(height: 20),
-              ],
-
-              // Media Assets Grid
-              Text('MEDIA ASSETS (${assets.length})',
-                  style: AppTheme.labelSm.copyWith(color: const Color(0xFF94A3B8), letterSpacing: 0.8)),
-              const SizedBox(height: 8),
-
-              if (mediaState is MediaLoading || mediaState is MediaInitial)
-                const Center(child: CircularProgressIndicator())
-              else if (assets.isEmpty)
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      children: [
-                        const Icon(Icons.video_library_outlined, size: 48, color: Colors.grey),
-                        const SizedBox(height: 12),
-                        const Text('No media in project bin', style: AppTheme.headingSm),
-                        const SizedBox(height: 12),
-                        FilledButton.icon(
-                          icon: const Icon(Icons.upload_file),
-                          label: const Text('Upload Media'),
-                          onPressed: () => _showUploadPicker(context),
+              ] else ...[
+                // Standard Media Bin & Semantic Search Bar
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _mediaSearchController,
+                        decoration: InputDecoration(
+                          hintText:
+                              'Semantic search (speech, scenes, captions)...',
+                          prefixIcon: const Icon(Icons.search,
+                              size: 18, color: Color(0xFF94A3B8)),
+                          suffixIcon: isSearching
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear, size: 16),
+                                  onPressed: () {
+                                    _mediaSearchController.clear();
+                                    context
+                                        .read<MediaBloc>()
+                                        .add(const MediaSearchCleared());
+                                  },
+                                )
+                              : null,
                         ),
-                      ],
+                        onSubmitted: (val) {
+                          if (val.trim().isNotEmpty) {
+                            context
+                                .read<MediaBloc>()
+                                .add(MediaSearchRequested(val.trim()));
+                          }
+                        },
+                      ),
                     ),
-                  ),
-                )
-              else
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 0.84,
-                  ),
-                  itemCount: assets.length,
-                  itemBuilder: (context, index) => _buildMediaAssetCard(context, assets[index]),
+                    const SizedBox(width: 10),
+                    FilledButton.icon(
+                      icon: mediaState is MediaUploading
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Icon(Icons.upload_file, size: 16),
+                      label: const Text('Upload'),
+                      onPressed: mediaState is MediaUploading
+                          ? null
+                          : () => _showUploadPicker(),
+                    ),
+                  ],
                 ),
+
+                const SizedBox(height: 16),
+
+                // Upload error banner
+                if (mediaState is MediaError) ...[
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.error.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(mediaState.message,
+                        style: const TextStyle(
+                            color: AppTheme.error, fontSize: 11)),
+                  ),
+                ],
+
+                // Search Results
+                if (isSearching) ...[
+                  Text('SEMANTIC MATCHES',
+                      style: AppTheme.labelSm
+                          .copyWith(color: AppTheme.cyan, letterSpacing: 0.8)),
+                  const SizedBox(height: 8),
+                  if (searching)
+                    const Center(
+                        child: CircularProgressIndicator(color: AppTheme.cyan))
+                  else if (searchHits.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Text('No semantic matches found for your query.'),
+                    )
+                  else
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: searchHits.length,
+                      itemBuilder: (context, index) {
+                        final hit = searchHits[index];
+                        return Container(
+                          margin: const EdgeInsets.symmetric(vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppTheme.cardDark,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppTheme.borderSubtle),
+                          ),
+                          child: ListTile(
+                            leading: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppTheme.cyan.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.subtitles,
+                                  size: 18, color: AppTheme.cyan),
+                            ),
+                            title: Text(hit.name ?? hit.path ?? 'Media',
+                                style:
+                                    AppTheme.headingSm.copyWith(fontSize: 12)),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (hit.spokenEn != null || hit.textEn != null)
+                                  Text(
+                                    '"${hit.spokenEn ?? hit.textEn}"',
+                                    style: AppTheme.bodySm
+                                        .copyWith(color: Colors.white70),
+                                  ),
+                                if (hit.start != null)
+                                  Text(
+                                    'Time: ${hit.start!.toStringAsFixed(1)}s - ${hit.end?.toStringAsFixed(1)}s',
+                                    style: AppTheme.monospaceCode
+                                        .copyWith(fontSize: 9),
+                                  ),
+                              ],
+                            ),
+                            trailing: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primary.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '${(hit.score * 100).toInt()}% match',
+                                style: AppTheme.labelSm.copyWith(
+                                    color: AppTheme.primary, fontSize: 9),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  const SizedBox(height: 20),
+                ],
+
+                // Media Assets Grid
+                Text('MEDIA ASSETS (${filteredAssets.length})',
+                    style: AppTheme.labelSm.copyWith(
+                        color: const Color(0xFF94A3B8), letterSpacing: 0.8)),
+                const SizedBox(height: 8),
+
+                if (mediaState is MediaLoading || mediaState is MediaInitial)
+                  const Center(
+                      child: CircularProgressIndicator(color: AppTheme.cyan))
+                else if (filteredAssets.isEmpty)
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        children: [
+                          const Icon(Icons.video_library_outlined,
+                              size: 48, color: Colors.grey),
+                          const SizedBox(height: 12),
+                          const Text('No media in project bin',
+                              style: AppTheme.headingSm),
+                          const SizedBox(height: 12),
+                          FilledButton.icon(
+                            icon: const Icon(Icons.upload_file),
+                            label: const Text('Upload Media'),
+                            onPressed: () => _showUploadPicker(),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      mainAxisSpacing: 12,
+                      crossAxisSpacing: 12,
+                      childAspectRatio: 0.84,
+                    ),
+                    itemCount: filteredAssets.length,
+                    itemBuilder: (context, index) =>
+                        _buildMediaAssetCard(context, filteredAssets[index]),
+                  ),
+              ],
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildMediaCategoryChip(String label, int index) {
+    final isSelected = _selectedMediaTab == index;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedMediaTab = index),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected ? AppTheme.primary : AppTheme.surfaceDark2,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+              color: isSelected ? AppTheme.primary : AppTheme.borderSubtle),
+        ),
+        child: Text(
+          label,
+          style: AppTheme.labelSm.copyWith(
+            color: isSelected ? Colors.white : const Color(0xFF94A3B8),
+            fontSize: 10,
+          ),
+        ),
+      ),
     );
   }
 
@@ -836,7 +1145,9 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
               asset: asset,
               streamUrl: fileUrl,
               onDescribe: () {
-                context.read<MediaBloc>().add(MediaDescribeRequested(asset.path));
+                context
+                    .read<MediaBloc>()
+                    .add(MediaDescribeRequested(asset.path));
               },
               onDelete: () {
                 context.read<MediaBloc>().add(MediaDeleteRequested(asset.path));
@@ -854,14 +1165,19 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      (isVideo ? AppTheme.primary : isAudio ? AppTheme.pink : AppTheme.cyan)
+                      (isVideo
+                              ? AppTheme.primary
+                              : isAudio
+                                  ? AppTheme.pink
+                                  : AppTheme.cyan)
                           .withValues(alpha: 0.25),
                       AppTheme.surfaceDark,
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(16)),
                 ),
                 child: Stack(
                   children: [
@@ -885,14 +1201,16 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
                         bottom: 6,
                         right: 6,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: Colors.black87,
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
                             '${asset.duration.toStringAsFixed(1)}s',
-                            style: AppTheme.monospaceCode.copyWith(fontSize: 9, color: Colors.white),
+                            style: AppTheme.monospaceCode
+                                .copyWith(fontSize: 9, color: Colors.white),
                           ),
                         ),
                       ),
@@ -928,7 +1246,8 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
                       const Spacer(),
                       Text(
                         asset.transcript?.state ?? 'ready',
-                        style: AppTheme.labelSm.copyWith(fontSize: 8, color: AppTheme.success),
+                        style: AppTheme.labelSm
+                            .copyWith(fontSize: 8, color: AppTheme.success),
                       ),
                     ],
                   ),
@@ -941,7 +1260,7 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
     );
   }
 
-  Future<void> _showUploadPicker(BuildContext context) async {
+  Future<void> _showUploadPicker() async {
     final picked = await _picker.pickImage(source: ImageSource.gallery);
     if (picked != null && mounted) {
       context.read<MediaBloc>().add(
@@ -961,7 +1280,8 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
     return BlocBuilder<TimelineBloc, TimelineState>(
       builder: (context, state) {
         if (state is TimelineLoading || state is TimelineInitial) {
-          return const Center(child: CircularProgressIndicator(color: AppTheme.primary));
+          return const Center(
+              child: CircularProgressIndicator(color: AppTheme.primary));
         }
         if (state is TimelineError) {
           return Center(
@@ -972,7 +1292,9 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
                 const SizedBox(height: 8),
                 Text('Failed to load timeline: ${state.message}'),
                 FilledButton(
-                  onPressed: () => context.read<TimelineBloc>().add(const TimelineRefreshRequested()),
+                  onPressed: () => context
+                      .read<TimelineBloc>()
+                      .add(const TimelineRefreshRequested()),
                   child: const Text('Retry'),
                 ),
               ],
@@ -987,12 +1309,10 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
                 child: TimelineTrackView(
                   timeline: timeline,
                   onTimelineChanged: (updatedDoc) async {
-                    await context.read<TimelineBloc>().api.updateTimeline(
-                          widget.projectId,
-                          updatedDoc,
-                        );
+                    final bloc = context.read<TimelineBloc>();
+                    await bloc.api.updateTimeline(widget.projectId, updatedDoc);
                     if (mounted) {
-                      context.read<TimelineBloc>().add(const TimelineRefreshRequested());
+                      bloc.add(const TimelineRefreshRequested());
                     }
                   },
                 ),
@@ -1013,7 +1333,8 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
     return BlocBuilder<HistoryBloc, HistoryState>(
       builder: (context, state) {
         if (state is HistoryLoading || state is HistoryInitial) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(
+              child: CircularProgressIndicator(color: AppTheme.primary));
         }
         if (state is HistoryError) {
           return Center(child: Text('History error: ${state.message}'));
@@ -1034,12 +1355,17 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
                         label: const Text('Undo'),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
                         ),
                         onPressed: history.canUndo
                             ? () {
-                                context.read<HistoryBloc>().add(const HistoryUndoRequested());
-                                context.read<TimelineBloc>().add(const TimelineRefreshRequested());
+                                context
+                                    .read<HistoryBloc>()
+                                    .add(const HistoryUndoRequested());
+                                context
+                                    .read<TimelineBloc>()
+                                    .add(const TimelineRefreshRequested());
                               }
                             : null,
                       ),
@@ -1051,12 +1377,17 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
                         label: const Text('Redo'),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
                         ),
                         onPressed: history.canRedo
                             ? () {
-                                context.read<HistoryBloc>().add(const HistoryRedoRequested());
-                                context.read<TimelineBloc>().add(const TimelineRefreshRequested());
+                                context
+                                    .read<HistoryBloc>()
+                                    .add(const HistoryRedoRequested());
+                                context
+                                    .read<TimelineBloc>()
+                                    .add(const TimelineRefreshRequested());
                               }
                             : null,
                       ),
@@ -1066,8 +1397,10 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
                       icon: const Icon(Icons.bookmark_add_outlined, size: 16),
                       label: const Text('Checkpoint'),
                       style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
                       ),
                       onPressed: () => _showCreateCheckpointDialog(context),
                     ),
@@ -1077,7 +1410,8 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
 
                 Text(
                   'REVISION TIMELINE (${history.revisions.length})',
-                  style: AppTheme.labelSm.copyWith(color: AppTheme.cyan, letterSpacing: 0.8),
+                  style: AppTheme.labelSm
+                      .copyWith(color: AppTheme.cyan, letterSpacing: 0.8),
                 ),
                 const SizedBox(height: 8),
 
@@ -1096,36 +1430,49 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
                                 color: AppTheme.cardDark,
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
-                                  color: isCurrent ? AppTheme.primary : AppTheme.borderSubtle,
+                                  color: isCurrent
+                                      ? AppTheme.primary
+                                      : AppTheme.borderSubtle,
                                   width: isCurrent ? 1.8 : 1.0,
                                 ),
-                                boxShadow: isCurrent ? AppTheme.shadowGlowPrimary : null,
+                                boxShadow: isCurrent
+                                    ? AppTheme.shadowGlowPrimary
+                                    : null,
                               ),
                               child: ListTile(
                                 leading: Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: (isCurrent ? AppTheme.primary : AppTheme.surfaceDark2)
+                                    color: (isCurrent
+                                            ? AppTheme.primary
+                                            : AppTheme.surfaceDark2)
                                         .withValues(alpha: 0.25),
                                     shape: BoxShape.circle,
                                   ),
                                   child: Icon(
                                     isCurrent ? Icons.check : Icons.history,
                                     size: 16,
-                                    color: isCurrent ? AppTheme.primary : Colors.grey,
+                                    color: isCurrent
+                                        ? AppTheme.primary
+                                        : Colors.grey,
                                   ),
                                 ),
-                                title: Text(rev.message, style: AppTheme.headingSm.copyWith(fontSize: 12)),
+                                title: Text(rev.message,
+                                    style: AppTheme.headingSm
+                                        .copyWith(fontSize: 12)),
                                 subtitle: Text(
-                                  DateFormat('MMM d, HH:mm:ss').format(rev.timestamp),
+                                  DateFormat('MMM d, HH:mm:ss')
+                                      .format(rev.timestamp),
                                   style: AppTheme.bodySm.copyWith(fontSize: 10),
                                 ),
                                 trailing: rev.checkpoint != null
                                     ? Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 4),
                                         decoration: BoxDecoration(
                                           gradient: AppTheme.primaryGradient,
-                                          borderRadius: BorderRadius.circular(6),
+                                          borderRadius:
+                                              BorderRadius.circular(6),
                                         ),
                                         child: Text(
                                           rev.checkpoint!,
@@ -1138,10 +1485,12 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
                                       )
                                     : (!isCurrent
                                         ? TextButton(
-                                            child: const Text('Restore', style: TextStyle(fontSize: 11)),
+                                            child: const Text('Restore',
+                                                style: TextStyle(fontSize: 11)),
                                             onPressed: () {
                                               context.read<HistoryBloc>().add(
-                                                    HistoryRestoreRequested(rev.id),
+                                                    HistoryRestoreRequested(
+                                                        rev.id),
                                                   );
                                               context.read<TimelineBloc>().add(
                                                     const TimelineRefreshRequested(),
@@ -1171,7 +1520,8 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
         title: const Text('Create Checkpoint Tag'),
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(hintText: 'e.g. v2.0-Teaser-Master'),
+          decoration:
+              const InputDecoration(hintText: 'e.g. v2.0-Teaser-Master'),
         ),
         actions: [
           TextButton(
@@ -1182,7 +1532,9 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
             onPressed: () {
               final name = controller.text.trim();
               if (name.isNotEmpty) {
-                context.read<HistoryBloc>().add(HistoryCheckpointRequested(name));
+                context
+                    .read<HistoryBloc>()
+                    .add(HistoryCheckpointRequested(name));
                 Navigator.pop(dialogContext);
               }
             },
@@ -1211,13 +1563,15 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                'High-performance GPU/CPU hardware rendering pipeline powered by Parallax backend engine.',
+                'High-performance GPU hardware rendering pipeline powered by Parallax backend engine.',
                 style: AppTheme.bodySm.copyWith(color: const Color(0xFF94A3B8)),
               ),
               const SizedBox(height: 18),
 
               // Format Segmented Pills
-              Text('OUTPUT FORMAT', style: AppTheme.labelSm.copyWith(color: AppTheme.cyan, letterSpacing: 0.8)),
+              Text('OUTPUT FORMAT',
+                  style: AppTheme.labelSm
+                      .copyWith(color: AppTheme.cyan, letterSpacing: 0.8)),
               const SizedBox(height: 8),
               SegmentedButton<String>(
                 segments: const [
@@ -1228,12 +1582,16 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
                   ButtonSegment(value: 'mp3', label: Text('MP3')),
                 ],
                 selected: {state.format},
-                onSelectionChanged: (set) => context.read<ExportBloc>().add(ExportFormatChanged(set.first)),
+                onSelectionChanged: (set) => context
+                    .read<ExportBloc>()
+                    .add(ExportFormatChanged(set.first)),
               ),
               const SizedBox(height: 18),
 
               // Resolution Segmented Pills
-              Text('RESOLUTION', style: AppTheme.labelSm.copyWith(color: AppTheme.secondary, letterSpacing: 0.8)),
+              Text('RESOLUTION',
+                  style: AppTheme.labelSm
+                      .copyWith(color: AppTheme.secondary, letterSpacing: 0.8)),
               const SizedBox(height: 8),
               SegmentedButton<String>(
                 segments: const [
@@ -1243,20 +1601,26 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
                   ButtonSegment(value: 'source', label: Text('Source')),
                 ],
                 selected: {state.resolution},
-                onSelectionChanged: (set) => context.read<ExportBloc>().add(ExportResolutionChanged(set.first)),
+                onSelectionChanged: (set) => context
+                    .read<ExportBloc>()
+                    .add(ExportResolutionChanged(set.first)),
               ),
               const SizedBox(height: 18),
 
               // Framerate
-              Text('FRAMERATE (FPS)', style: AppTheme.labelSm.copyWith(color: const Color(0xFF94A3B8), letterSpacing: 0.8)),
+              Text('FRAMERATE (FPS)',
+                  style: AppTheme.labelSm.copyWith(
+                      color: const Color(0xFF94A3B8), letterSpacing: 0.8)),
               const SizedBox(height: 6),
               DropdownButtonFormField<int>(
                 initialValue: state.fps,
                 dropdownColor: AppTheme.cardDark,
                 items: const [
-                  DropdownMenuItem(value: 24, child: Text('24 FPS (Cinematic Look)')),
+                  DropdownMenuItem(
+                      value: 24, child: Text('24 FPS (Cinematic Look)')),
                   DropdownMenuItem(value: 30, child: Text('30 FPS (Standard)')),
-                  DropdownMenuItem(value: 60, child: Text('60 FPS (Ultra Smooth)')),
+                  DropdownMenuItem(
+                      value: 60, child: Text('60 FPS (Ultra Smooth)')),
                 ],
                 onChanged: (val) {
                   if (val != null) {
@@ -1273,11 +1637,17 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
                   border: Border.all(color: AppTheme.borderSubtle),
                 ),
                 child: SwitchListTile(
-                  title: const Text('Burn Subtitles / Captions', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                  subtitle: const Text('Hardcode visible captions directly into the rendered video sequence', style: TextStyle(fontSize: 11)),
+                  title: const Text('Burn Subtitles / Captions',
+                      style:
+                          TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  subtitle: const Text(
+                      'Hardcode visible captions directly into the rendered video sequence',
+                      style: TextStyle(fontSize: 11)),
                   value: state.burnCaptions,
                   activeThumbColor: AppTheme.primary,
-                  onChanged: (val) => context.read<ExportBloc>().add(ExportBurnCaptionsToggled(val)),
+                  onChanged: (val) => context
+                      .read<ExportBloc>()
+                      .add(ExportBurnCaptionsToggled(val)),
                 ),
               ),
               const SizedBox(height: 20),
@@ -1291,7 +1661,9 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
                     color: AppTheme.error.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Text(state.error!, style: const TextStyle(color: AppTheme.error, fontSize: 11)),
+                  child: Text(state.error!,
+                      style:
+                          const TextStyle(color: AppTheme.error, fontSize: 11)),
                 ),
               ],
 
@@ -1301,20 +1673,28 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
                 child: FilledButton.icon(
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                   ),
                   icon: state.isExporting
                       ? const SizedBox(
                           width: 16,
                           height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
                         )
                       : const Icon(Icons.movie_creation, size: 18),
                   label: Text(
-                    state.isExporting ? 'Rendering Master Sequence...' : 'Start Export Render',
+                    state.isExporting
+                        ? 'Rendering Master Sequence...'
+                        : 'Start Export Render',
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
-                  onPressed: state.isExporting ? null : () => context.read<ExportBloc>().add(const ExportStartRequested()),
+                  onPressed: state.isExporting
+                      ? null
+                      : () => context
+                          .read<ExportBloc>()
+                          .add(const ExportStartRequested()),
                 ),
               ),
 
@@ -1328,7 +1708,9 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: AppTheme.success),
                     boxShadow: [
-                      BoxShadow(color: AppTheme.success.withValues(alpha: 0.2), blurRadius: 12),
+                      BoxShadow(
+                          color: AppTheme.success.withValues(alpha: 0.2),
+                          blurRadius: 12),
                     ],
                   ),
                   child: Column(
@@ -1336,25 +1718,20 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
                     children: [
                       const Row(
                         children: [
-                          Icon(Icons.check_circle, color: AppTheme.success, size: 20),
+                          Icon(Icons.check_circle,
+                              color: AppTheme.success, size: 20),
                           SizedBox(width: 8),
-                          Text('Render Completed Successfully!', style: AppTheme.headingSm),
+                          Text('Render Completed Successfully!',
+                              style: AppTheme.headingSm),
                         ],
                       ),
                       const SizedBox(height: 8),
                       if (state.result!.outputPath != null)
                         Text(
                           'File: ${state.result!.outputPath}',
-                          style: AppTheme.bodySm.copyWith(color: Colors.white70),
+                          style:
+                              AppTheme.bodySm.copyWith(color: Colors.white70),
                         ),
-                      if (state.result!.downloadUrl != null) ...[
-                        const SizedBox(height: 12),
-                        FilledButton.icon(
-                          icon: const Icon(Icons.download),
-                          label: const Text('Download Master Render'),
-                          onPressed: () {},
-                        ),
-                      ],
                     ],
                   ),
                 ),

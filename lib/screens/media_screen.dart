@@ -4,7 +4,7 @@ import 'package:parallax_mobile/screens/project_workspace_screen.dart';
 class MediaScreen extends StatelessWidget {
   final String projectId;
 
-  const MediaScreen({Key? key, required this.projectId}) : super(key: key);
+  const MediaScreen({super.key, required this.projectId});
 
   @override
   Widget build(BuildContext context) {

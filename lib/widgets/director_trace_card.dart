@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:parallax_mobile/config/theme.dart';
 import 'package:parallax_mobile/data/models.dart';
 
@@ -7,7 +8,7 @@ import 'package:parallax_mobile/data/models.dart';
 class DirectorTraceCard extends StatefulWidget {
   final DirectorActivity activity;
 
-  const DirectorTraceCard({Key? key, required this.activity}) : super(key: key);
+  const DirectorTraceCard({super.key, required this.activity});
 
   @override
   State<DirectorTraceCard> createState() => _DirectorTraceCardState();
@@ -23,6 +24,9 @@ class _DirectorTraceCardState extends State<DirectorTraceCard> {
         return Icons.movie_filter_outlined;
       case 'generate_image':
         return Icons.auto_awesome;
+      case 'search_gifs':
+      case 'import_gif':
+        return Icons.gif_box_outlined;
       case 'place_media':
       case 'modify_timeline_clips':
       case 'timeline_edit':
@@ -70,21 +74,21 @@ class _DirectorTraceCardState extends State<DirectorTraceCard> {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceDark.withValues(alpha: 0.8),
-        borderRadius: BorderRadius.circular(12),
+        color: AppTheme.cardElevated.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: act.status == 'active'
               ? color.withValues(alpha: 0.7)
               : AppTheme.borderSubtle,
-          width: act.status == 'active' ? 1.2 : 1.0,
+          width: act.status == 'active' ? 1.4 : 1.0,
         ),
-        boxShadow: act.status == 'active' ? AppTheme.shadowGlowCyan : null,
+        boxShadow: act.status == 'active' ? AppTheme.shadowGlowCyan : AppTheme.shadowSm,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           InkWell(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
             onTap: hasDetails
                 ? () {
                     setState(() {
@@ -93,16 +97,16 @@ class _DirectorTraceCardState extends State<DirectorTraceCard> {
                   }
                 : null,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
               child: Row(
                 children: [
                   Container(
-                    width: 30,
-                    height: 30,
+                    width: 32,
+                    height: 32,
                     decoration: BoxDecoration(
                       color: color.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: color.withValues(alpha: 0.3)),
+                      borderRadius: BorderRadius.circular(9),
+                      border: Border.all(color: color.withValues(alpha: 0.35)),
                     ),
                     child: Icon(
                       _getIconForTool(act.name),
@@ -135,9 +139,16 @@ class _DirectorTraceCardState extends State<DirectorTraceCard> {
                               ),
                               if (act.elapsedMs != null) ...[
                                 const SizedBox(width: 6),
-                                Text(
-                                  '• ${act.elapsedMs}ms',
-                                  style: AppTheme.bodySm.copyWith(fontSize: 9),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.surfaceDark2,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    '${act.elapsedMs}ms',
+                                    style: AppTheme.bodySm.copyWith(fontSize: 8, color: const Color(0xFF94A3B8)),
+                                  ),
                                 ),
                               ],
                             ],
@@ -160,6 +171,7 @@ class _DirectorTraceCardState extends State<DirectorTraceCard> {
                       decoration: BoxDecoration(
                         color: AppTheme.success.withValues(alpha: 0.15),
                         shape: BoxShape.circle,
+                        border: Border.all(color: AppTheme.success.withValues(alpha: 0.4)),
                       ),
                       child: const Icon(Icons.check, size: 12, color: AppTheme.success),
                     )
@@ -169,6 +181,7 @@ class _DirectorTraceCardState extends State<DirectorTraceCard> {
                       decoration: BoxDecoration(
                         color: AppTheme.error.withValues(alpha: 0.15),
                         shape: BoxShape.circle,
+                        border: Border.all(color: AppTheme.error.withValues(alpha: 0.4)),
                       ),
                       child: const Icon(Icons.close, size: 12, color: AppTheme.error),
                     ),
@@ -187,7 +200,7 @@ class _DirectorTraceCardState extends State<DirectorTraceCard> {
           if (_expanded && hasDetails) ...[
             const Divider(height: 1, color: AppTheme.borderSubtle),
             Padding(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -200,15 +213,40 @@ class _DirectorTraceCardState extends State<DirectorTraceCard> {
                           'PAYLOAD',
                           style: AppTheme.labelSm.copyWith(color: AppTheme.cyan, fontSize: 9),
                         ),
+                        const Spacer(),
+                        InkWell(
+                          onTap: () {
+                            final raw = act.arguments is String
+                                ? act.arguments as String
+                                : const JsonEncoder.withIndent('  ').convert(act.arguments);
+                            Clipboard.setData(ClipboardData(text: raw));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Payload copied to clipboard'),
+                                duration: Duration(seconds: 1),
+                              ),
+                            );
+                          },
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                            child: Row(
+                              children: [
+                                Icon(Icons.copy, size: 10, color: Color(0xFF94A3B8)),
+                                SizedBox(width: 3),
+                                Text('Copy', style: TextStyle(fontSize: 9, color: Color(0xFF94A3B8))),
+                              ],
+                            ),
+                          ),
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         color: AppTheme.bgDark,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: AppTheme.borderSubtle),
                       ),
                       child: SelectableText(
@@ -224,7 +262,7 @@ class _DirectorTraceCardState extends State<DirectorTraceCard> {
                     ),
                   ],
                   if (act.detail != null) ...[
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     Row(
                       children: [
                         Icon(
@@ -240,23 +278,49 @@ class _DirectorTraceCardState extends State<DirectorTraceCard> {
                             fontSize: 9,
                           ),
                         ),
+                        const Spacer(),
+                        InkWell(
+                          onTap: () {
+                            Clipboard.setData(ClipboardData(text: act.detail!));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Output copied to clipboard'),
+                                duration: Duration(seconds: 1),
+                              ),
+                            );
+                          },
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                            child: Row(
+                              children: [
+                                Icon(Icons.copy, size: 10, color: Color(0xFF94A3B8)),
+                                SizedBox(width: 3),
+                                Text('Copy', style: TextStyle(fontSize: 9, color: Color(0xFF94A3B8))),
+                              ],
+                            ),
+                          ),
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         color: AppTheme.bgDark,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppTheme.borderSubtle),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: act.status == 'error'
+                              ? AppTheme.error.withValues(alpha: 0.4)
+                              : AppTheme.borderSubtle,
+                        ),
                       ),
                       child: SelectableText(
                         act.detail!,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: 'monospace',
                           fontSize: 10,
-                          color: Color(0xFF94A3B8),
+                          color: act.status == 'error' ? const Color(0xFFFCA5A5) : const Color(0xFF94A3B8),
                         ),
                       ),
                     ),

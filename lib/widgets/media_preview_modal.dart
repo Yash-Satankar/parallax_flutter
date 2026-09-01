@@ -12,12 +12,12 @@ class MediaPreviewModal extends StatefulWidget {
   final VoidCallback? onDelete;
 
   const MediaPreviewModal({
-    Key? key,
+    super.key,
     required this.asset,
     required this.streamUrl,
     this.onDescribe,
     this.onDelete,
-  }) : super(key: key);
+  });
 
   @override
   State<MediaPreviewModal> createState() => _MediaPreviewModalState();
@@ -77,244 +77,249 @@ class _MediaPreviewModalState extends State<MediaPreviewModal> {
     return '$mins:${secs.toString().padLeft(2, '0')}';
   }
 
-  String _formatBytes(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024) {
-      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-    }
-    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
-  }
-
   @override
   Widget build(BuildContext context) {
     final asset = widget.asset;
     final isAudio = asset.kind == 'audio';
     final isVideo = asset.kind == 'video';
 
+    final mediaSubtitle = [
+      asset.kind.toUpperCase(),
+      FormatUtils.formatBytes(asset.bytes),
+      if (asset.duration > 0) _formatDuration(asset.duration),
+      if (asset.width != null) '${asset.width}x${asset.height}',
+    ].join(' • ');
+
     return Container(
       decoration: const BoxDecoration(
-        color: AppTheme.cardDark,
+        color: AppTheme.cardElevated,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         border: Border(top: BorderSide(color: AppTheme.borderSubtle)),
       ),
       padding: const EdgeInsets.only(bottom: 24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Drag handle
-          Container(
-            margin: const EdgeInsets.only(top: 12, bottom: 8),
-            width: 44,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey[700],
-              borderRadius: BorderRadius.circular(2),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Drag handle
+            Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 8),
+              width: 44,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[700],
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
-          ),
 
-          // Header
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: (isVideo
-                            ? AppTheme.cyan
-                            : isAudio
-                                ? AppTheme.pink
-                                : AppTheme.secondary)
-                        .withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    isVideo
-                        ? Icons.videocam_outlined
-                        : isAudio
-                            ? Icons.graphic_eq
-                            : Icons.image_outlined,
-                    size: 20,
-                    color: isVideo
-                        ? AppTheme.cyan
-                        : isAudio
-                            ? AppTheme.pink
-                            : AppTheme.secondary,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        asset.name,
-                        style: AppTheme.headingSm,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+            // Header
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: (isVideo
+                              ? AppTheme.cyan
+                              : isAudio
+                                  ? AppTheme.pink
+                                  : AppTheme.secondary)
+                          .withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: (isVideo
+                                ? AppTheme.cyan
+                                : isAudio
+                                    ? AppTheme.pink
+                                    : AppTheme.secondary)
+                            .withValues(alpha: 0.3),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${asset.kind.toUpperCase()} • ${_formatBytes(asset.bytes)}' +
-                            (asset.duration > 0
-                                ? ' • ${_formatDuration(asset.duration)}'
-                                : '') +
-                            (asset.width != null
-                                ? ' • ${asset.width}x${asset.height}'
-                                : ''),
-                        style: AppTheme.bodySm.copyWith(color: const Color(0xFF94A3B8)),
+                    ),
+                    child: Icon(
+                      isVideo
+                          ? Icons.videocam_outlined
+                          : isAudio
+                              ? Icons.graphic_eq
+                              : Icons.image_outlined,
+                      size: 20,
+                      color: isVideo
+                          ? AppTheme.cyan
+                          : isAudio
+                              ? AppTheme.pink
+                              : AppTheme.secondary,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          asset.name,
+                          style: AppTheme.headingSm,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          mediaSubtitle,
+                          style: AppTheme.bodySm.copyWith(color: const Color(0xFF94A3B8)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.grey),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+
+            const Divider(height: 1, color: AppTheme.borderSubtle),
+
+            // Player / Preview Viewport
+            Container(
+              width: double.infinity,
+              height: 220,
+              color: AppTheme.bgDark,
+              child: _buildPreviewContent(),
+            ),
+
+            // Controls if Video/Audio
+            if (_videoController != null && _initialized) ...[
+              VideoProgressIndicator(
+                _videoController!,
+                allowScrubbing: true,
+                colors: const VideoProgressColors(
+                  playedColor: AppTheme.primary,
+                  bufferedColor: Colors.white24,
+                  backgroundColor: AppTheme.surfaceDark2,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                        size: 34,
+                        color: AppTheme.primary,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          if (_isPlaying) {
+                            _videoController!.pause();
+                          } else {
+                            _videoController!.play();
+                          }
+                        });
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    ValueListenableBuilder(
+                      valueListenable: _videoController!,
+                      builder: (context, VideoPlayerValue value, child) {
+                        return Text(
+                          '${_formatDuration(value.position.inSeconds.toDouble())} / ${_formatDuration(value.duration.inSeconds.toDouble())}',
+                          style: AppTheme.monospaceCode.copyWith(color: Colors.white, fontSize: 11),
+                        );
+                      },
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.replay_10, size: 20),
+                      onPressed: () {
+                        final pos = _videoController!.value.position;
+                        _videoController!.seekTo(pos - const Duration(seconds: 10));
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.forward_10, size: 20),
+                      onPressed: () {
+                        final pos = _videoController!.value.position;
+                        _videoController!.seekTo(pos + const Duration(seconds: 10));
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            // Technical Specs & Transcription
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      _StatusChip(
+                        label: 'TRANSCRIPT: ${(asset.transcript?.state ?? "READY").toUpperCase()}',
+                        color: _getIndexColor(asset.transcript?.state),
+                      ),
+                      const SizedBox(width: 8),
+                      _StatusChip(
+                        label: 'INDEX: ${(asset.preview?.state ?? "INDEXED").toUpperCase()}',
+                        color: _getPreviewColor(asset.preview?.state),
                       ),
                     ],
                   ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close, color: Colors.grey),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-          ),
 
-          const Divider(height: 1, color: AppTheme.borderSubtle),
-
-          // Player / Preview Viewport
-          Container(
-            width: double.infinity,
-            height: 220,
-            color: AppTheme.bgDark,
-            child: _buildPreviewContent(),
-          ),
-
-          // Controls if Video/Audio
-          if (_videoController != null && _initialized) ...[
-            VideoProgressIndicator(
-              _videoController!,
-              allowScrubbing: true,
-              colors: const VideoProgressColors(
-                playedColor: AppTheme.primary,
-                bufferedColor: Colors.white24,
-                backgroundColor: AppTheme.surfaceDark2,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
-                      size: 34,
-                      color: AppTheme.primary,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        if (_isPlaying) {
-                          _videoController!.pause();
-                        } else {
-                          _videoController!.play();
-                        }
-                      });
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  ValueListenableBuilder(
-                    valueListenable: _videoController!,
-                    builder: (context, VideoPlayerValue value, child) {
-                      return Text(
-                        '${_formatDuration(value.position.inSeconds.toDouble())} / ${_formatDuration(value.duration.inSeconds.toDouble())}',
-                        style: AppTheme.monospaceCode.copyWith(color: Colors.white, fontSize: 11),
-                      );
-                    },
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.replay_10, size: 20),
-                    onPressed: () {
-                      final pos = _videoController!.value.position;
-                      _videoController!.seekTo(pos - const Duration(seconds: 10));
-                    },
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.forward_10, size: 20),
-                    onPressed: () {
-                      final pos = _videoController!.value.position;
-                      _videoController!.seekTo(pos + const Duration(seconds: 10));
-                    },
+                  // Action Buttons
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      if (widget.onDescribe != null)
+                        Expanded(
+                          child: FilledButton.icon(
+                            icon: const Icon(Icons.auto_awesome, size: 16),
+                            label: const Text('Describe AI'),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppTheme.cyan.withValues(alpha: 0.2),
+                              foregroundColor: AppTheme.cyan,
+                              side: const BorderSide(color: AppTheme.cyan),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            onPressed: () {
+                              Navigator.pop(context);
+                              widget.onDescribe?.call();
+                            },
+                          ),
+                        ),
+                      if (widget.onDescribe != null && widget.onDelete != null)
+                        const SizedBox(width: 12),
+                      if (widget.onDelete != null)
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.delete_outline, size: 16),
+                            label: const Text('Delete'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppTheme.error,
+                              side: const BorderSide(color: AppTheme.error),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            onPressed: () {
+                              Navigator.pop(context);
+                              widget.onDelete?.call();
+                            },
+                          ),
+                        ),
+                    ],
                   ),
                 ],
               ),
             ),
           ],
-
-          // Metadata Specs & Actions
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    _StatusChip(
-                      label: 'TRANSCRIPT: ${(asset.transcript?.state ?? "READY").toUpperCase()}',
-                      color: _getIndexColor(asset.transcript?.state),
-                    ),
-                    const SizedBox(width: 8),
-                    _StatusChip(
-                      label: 'INDEX: ${(asset.preview?.state ?? "INDEXED").toUpperCase()}',
-                      color: _getPreviewColor(asset.preview?.state),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    if (widget.onDescribe != null)
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Icons.auto_awesome, size: 16),
-                          label: const Text('Describe AI'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppTheme.cyan,
-                            side: const BorderSide(color: AppTheme.cyan),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          onPressed: () {
-                            Navigator.pop(context);
-                            widget.onDescribe?.call();
-                          },
-                        ),
-                      ),
-                    if (widget.onDescribe != null && widget.onDelete != null)
-                      const SizedBox(width: 12),
-                    if (widget.onDelete != null)
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Icons.delete_outline, size: 16),
-                          label: const Text('Delete'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppTheme.error,
-                            side: const BorderSide(color: AppTheme.error),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          onPressed: () {
-                            Navigator.pop(context);
-                            widget.onDelete?.call();
-                          },
-                        ),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -324,7 +329,7 @@ class _MediaPreviewModalState extends State<MediaPreviewModal> {
       return CachedNetworkImage(
         imageUrl: widget.streamUrl,
         fit: BoxFit.contain,
-        placeholder: (_, __) => const Center(child: CircularProgressIndicator()),
+        placeholder: (_, __) => const Center(child: CircularProgressIndicator(color: AppTheme.primary)),
         errorWidget: (_, __, ___) => const Center(
           child: Icon(Icons.broken_image, color: Colors.grey, size: 48),
         ),
@@ -337,10 +342,11 @@ class _MediaPreviewModalState extends State<MediaPreviewModal> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
                 color: AppTheme.pink.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
+                border: Border.all(color: AppTheme.pink.withValues(alpha: 0.3)),
               ),
               child: const Icon(Icons.graphic_eq, size: 48, color: AppTheme.pink),
             ),
@@ -385,7 +391,7 @@ class _MediaPreviewModalState extends State<MediaPreviewModal> {
       );
     }
 
-    return const Center(child: CircularProgressIndicator());
+    return const Center(child: CircularProgressIndicator(color: AppTheme.cyan));
   }
 
   Color _getIndexColor(String? state) {
@@ -423,8 +429,7 @@ class _StatusChip extends StatelessWidget {
   final String label;
   final Color color;
 
-  const _StatusChip({Key? key, required this.label, required this.color})
-      : super(key: key);
+  const _StatusChip({required this.label, required this.color});
 
   @override
   Widget build(BuildContext context) {

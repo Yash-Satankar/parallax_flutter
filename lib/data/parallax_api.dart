@@ -186,6 +186,36 @@ class ParallaxApi {
     await _dio.delete('$_baseUrl/v1/projects/$projectId/files/$path');
   }
 
+  Future<GIFSearchResponse> searchGifs(
+    String query, {
+    int limit = 24,
+    int offset = 0,
+  }) async {
+    if (query.trim().isEmpty) {
+      return GIFSearchResponse(results: []);
+    }
+    final response = await _dio.get(
+      '$_baseUrl/v1/gifs',
+      queryParameters: {
+        'q': query.trim(),
+        'limit': limit,
+        'offset': offset,
+      },
+    );
+    if (response.data is Map<String, dynamic>) {
+      return GIFSearchResponse.fromJson(response.data as Map<String, dynamic>);
+    }
+    return GIFSearchResponse(results: []);
+  }
+
+  Future<MediaAsset> importGif(String projectId, String importRef) async {
+    final response = await _dio.post(
+      '$_baseUrl/v1/projects/$projectId/gifs/import',
+      data: {'import_ref': importRef},
+    );
+    return MediaAsset.fromJson(response.data as Map<String, dynamic>);
+  }
+
   String getFileUrl(String projectId, String path) {
     if (path.startsWith('http://') || path.startsWith('https://')) {
       return path;

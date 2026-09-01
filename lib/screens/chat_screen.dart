@@ -6,10 +6,10 @@ class ChatScreen extends StatelessWidget {
   final String chatId;
 
   const ChatScreen({
-    Key? key,
+    super.key,
     required this.projectId,
     required this.chatId,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

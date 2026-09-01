@@ -2,45 +2,38 @@ import 'package:flutter/material.dart';
 import 'package:parallax_mobile/config/theme.dart';
 import 'package:parallax_mobile/data/models.dart';
 
-/// Pro Multi-track NLE Sequence Timeline Widget
+/// Pro Multi-track NLE Sequence Timeline Widget with Interactive Editing Actions
 class TimelineTrackView extends StatefulWidget {
   final TimelineDocument timeline;
   final void Function(TimelineDocument updatedTimeline)? onTimelineChanged;
 
   const TimelineTrackView({
-    Key? key,
+    super.key,
     required this.timeline,
     this.onTimelineChanged,
-  }) : super(key: key);
+  });
 
   @override
   State<TimelineTrackView> createState() => _TimelineTrackViewState();
 }
 
 class _TimelineTrackViewState extends State<TimelineTrackView> {
-  double _zoom = 32.0; // pixels per second
+  double _zoom = 36.0; // pixels per second
   double _playhead = 0.0; // current playhead in seconds
   bool _isPlaying = false;
   final ScrollController _scrollController = ScrollController();
   String? _selectedClipId;
 
   Color _parseColor(String? colorString) {
-    if (colorString == null || colorString.isEmpty) return AppTheme.primary;
+    if (colorString == null || colorString.isEmpty) return AppTheme.cyan;
     try {
       if (colorString.startsWith('#')) {
         return Color(int.parse(colorString.replaceFirst('#', ''), radix: 16) + 0xFF000000);
       }
-      return AppTheme.primary;
+      return AppTheme.cyan;
     } catch (_) {
-      return AppTheme.primary;
+      return AppTheme.cyan;
     }
-  }
-
-  String _formatTime(double seconds) {
-    final mins = (seconds / 60).floor();
-    final secs = (seconds % 60).floor();
-    final ms = ((seconds - secs) * 100).floor();
-    return '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}.${ms.toString().padLeft(2, '0')}';
   }
 
   void _openClipInspector(Clip clip) {
@@ -74,6 +67,164 @@ class _TimelineTrackViewState extends State<TimelineTrackView> {
     );
   }
 
+  void _splitSelectedClip() {
+    if (_selectedClipId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tap a clip to select it for splitting')),
+      );
+      return;
+    }
+
+    final clipIndex = widget.timeline.clips.indexWhere((c) => c.id == _selectedClipId);
+    if (clipIndex < 0) return;
+
+    final targetClip = widget.timeline.clips[clipIndex];
+    final splitTime = _playhead;
+
+    if (splitTime <= targetClip.start || splitTime >= (targetClip.start + targetClip.duration)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Move playhead inside the selected clip to split')),
+      );
+      return;
+    }
+
+    final firstDuration = splitTime - targetClip.start;
+    final secondDuration = targetClip.duration - firstDuration;
+
+    final firstClip = Clip(
+      id: targetClip.id,
+      name: '${targetClip.name} (Part 1)',
+      track: targetClip.track,
+      kind: targetClip.kind,
+      start: targetClip.start,
+      duration: firstDuration,
+      sourceIn: targetClip.sourceIn,
+      sourceDuration: firstDuration,
+      thumb: targetClip.thumb,
+      src: targetClip.src,
+      mediaPath: targetClip.mediaPath,
+      mediaType: targetClip.mediaType,
+      width: targetClip.width,
+      height: targetClip.height,
+      color: targetClip.color,
+      enabled: targetClip.enabled,
+      audio: targetClip.audio,
+      transform: targetClip.transform,
+      grade: targetClip.grade,
+    );
+
+    final secondClip = Clip(
+      id: 'clip-${DateTime.now().millisecondsSinceEpoch}',
+      name: '${targetClip.name} (Part 2)',
+      track: targetClip.track,
+      kind: targetClip.kind,
+      start: splitTime,
+      duration: secondDuration,
+      sourceIn: (targetClip.sourceIn ?? 0.0) + firstDuration,
+      sourceDuration: secondDuration,
+      thumb: targetClip.thumb,
+      src: targetClip.src,
+      mediaPath: targetClip.mediaPath,
+      mediaType: targetClip.mediaType,
+      width: targetClip.width,
+      height: targetClip.height,
+      color: targetClip.color,
+      enabled: targetClip.enabled,
+      audio: targetClip.audio,
+      transform: targetClip.transform,
+      grade: targetClip.grade,
+    );
+
+    final updatedClips = List<Clip>.from(widget.timeline.clips);
+    updatedClips[clipIndex] = firstClip;
+    updatedClips.insert(clipIndex + 1, secondClip);
+
+    final updatedDoc = TimelineDocument(
+      duration: widget.timeline.duration,
+      fps: widget.timeline.fps,
+      width: widget.timeline.width,
+      height: widget.timeline.height,
+      tracks: widget.timeline.tracks,
+      clips: updatedClips,
+    );
+
+    widget.onTimelineChanged?.call(updatedDoc);
+    setState(() => _selectedClipId = secondClip.id);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Clip split into two parts at playhead')),
+    );
+  }
+
+  void _duplicateSelectedClip() {
+    if (_selectedClipId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select a clip to duplicate')),
+      );
+      return;
+    }
+
+    final clip = widget.timeline.clips.firstWhere((c) => c.id == _selectedClipId);
+    final duplicated = Clip(
+      id: 'clip-${DateTime.now().millisecondsSinceEpoch}',
+      name: '${clip.name} (Copy)',
+      track: clip.track,
+      kind: clip.kind,
+      start: clip.start + clip.duration + 0.1,
+      duration: clip.duration,
+      sourceIn: clip.sourceIn,
+      sourceDuration: clip.sourceDuration,
+      thumb: clip.thumb,
+      src: clip.src,
+      mediaPath: clip.mediaPath,
+      mediaType: clip.mediaType,
+      width: clip.width,
+      height: clip.height,
+      color: clip.color,
+      enabled: clip.enabled,
+      audio: clip.audio,
+      transform: clip.transform,
+      grade: clip.grade,
+    );
+
+    final updatedClips = [...widget.timeline.clips, duplicated];
+    final updatedDoc = TimelineDocument(
+      duration: (duplicated.start + duplicated.duration > widget.timeline.duration)
+          ? duplicated.start + duplicated.duration
+          : widget.timeline.duration,
+      fps: widget.timeline.fps,
+      width: widget.timeline.width,
+      height: widget.timeline.height,
+      tracks: widget.timeline.tracks,
+      clips: updatedClips,
+    );
+
+    widget.onTimelineChanged?.call(updatedDoc);
+    setState(() => _selectedClipId = duplicated.id);
+  }
+
+  void _deleteSelectedClip() {
+    if (_selectedClipId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select a clip to delete')),
+      );
+      return;
+    }
+
+    final updatedClips = widget.timeline.clips.where((c) => c.id != _selectedClipId).toList();
+    final updatedDoc = TimelineDocument(
+      duration: widget.timeline.duration,
+      fps: widget.timeline.fps,
+      width: widget.timeline.width,
+      height: widget.timeline.height,
+      tracks: widget.timeline.tracks,
+      clips: updatedClips,
+    );
+
+    widget.onTimelineChanged?.call(updatedDoc);
+    setState(() => _selectedClipId = null);
+  }
+
   @override
   Widget build(BuildContext context) {
     final totalDuration = widget.timeline.duration > 0 ? widget.timeline.duration : 45.0;
@@ -81,7 +232,7 @@ class _TimelineTrackViewState extends State<TimelineTrackView> {
 
     return Column(
       children: [
-        // Pro Playback & Timecode Header Bar
+        // Mini Preview & HUD Bar
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: const BoxDecoration(
@@ -90,7 +241,7 @@ class _TimelineTrackViewState extends State<TimelineTrackView> {
           ),
           child: Row(
             children: [
-              // Digital Timecode Display
+              // Digital Timecode Display HUD
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
@@ -104,11 +255,11 @@ class _TimelineTrackViewState extends State<TimelineTrackView> {
                     const Icon(Icons.timer_outlined, size: 13, color: AppTheme.cyan),
                     const SizedBox(width: 6),
                     Text(
-                      _formatTime(_playhead),
-                      style: AppTheme.monospaceCode.copyWith(fontSize: 13),
+                      FormatUtils.formatTimecode(_playhead),
+                      style: AppTheme.timecodeLarge.copyWith(fontSize: 12),
                     ),
                     Text(
-                      ' / ${_formatTime(totalDuration)}',
+                      ' / ${FormatUtils.formatTimecode(totalDuration)}',
                       style: const TextStyle(
                         fontFamily: 'monospace',
                         color: Color(0xFF64748B),
@@ -181,7 +332,7 @@ class _TimelineTrackViewState extends State<TimelineTrackView> {
             children: [
               // Track Headers (Left sidebar)
               Container(
-                width: 80,
+                width: 84,
                 color: AppTheme.surfaceDark,
                 child: Column(
                   children: [
@@ -272,7 +423,7 @@ class _TimelineTrackViewState extends State<TimelineTrackView> {
                           ],
                         ),
                       );
-                    }).toList(),
+                    }),
                   ],
                 ),
               ),
@@ -415,11 +566,11 @@ class _TimelineTrackViewState extends State<TimelineTrackView> {
                                           ),
                                         ),
                                       );
-                                    }).toList(),
+                                    }),
                                   ],
                                 ),
                               );
-                            }).toList(),
+                            }),
                           ],
                         ),
 
@@ -511,28 +662,32 @@ class _TimelineTrackViewState extends State<TimelineTrackView> {
               _buildProToolBtn(
                 icon: Icons.content_cut,
                 label: 'Split',
-                onTap: () {},
+                onTap: _splitSelectedClip,
               ),
               _buildProToolBtn(
-                icon: Icons.speed,
-                label: 'Speed',
-                onTap: () {},
-              ),
-              _buildProToolBtn(
-                icon: Icons.color_lens_outlined,
-                label: 'Grade',
-                onTap: () {},
+                icon: Icons.tune,
+                label: 'Inspect',
+                onTap: () {
+                  if (_selectedClipId != null) {
+                    final clip = widget.timeline.clips.firstWhere((c) => c.id == _selectedClipId);
+                    _openClipInspector(clip);
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Tap a clip first to inspect parameters')),
+                    );
+                  }
+                },
               ),
               _buildProToolBtn(
                 icon: Icons.copy_outlined,
                 label: 'Duplicate',
-                onTap: () {},
+                onTap: _duplicateSelectedClip,
               ),
               _buildProToolBtn(
                 icon: Icons.delete_outline,
                 label: 'Delete',
                 color: AppTheme.error,
-                onTap: () {},
+                onTap: _deleteSelectedClip,
               ),
             ],
           ),
@@ -646,8 +801,7 @@ class _ClipInspectorSheet extends StatefulWidget {
   final Clip clip;
   final void Function(Clip updatedClip) onUpdate;
 
-  const _ClipInspectorSheet({Key? key, required this.clip, required this.onUpdate})
-      : super(key: key);
+  const _ClipInspectorSheet({required this.clip, required this.onUpdate});
 
   @override
   State<_ClipInspectorSheet> createState() => _ClipInspectorSheetState();
@@ -701,7 +855,7 @@ class _ClipInspectorSheetState extends State<_ClipInspectorSheet> {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: AppTheme.cardDark,
+        color: AppTheme.cardElevated,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         border: Border(top: BorderSide(color: AppTheme.borderSubtle)),
       ),
@@ -733,6 +887,7 @@ class _ClipInspectorSheetState extends State<_ClipInspectorSheet> {
                 decoration: BoxDecoration(
                   color: AppTheme.cyan.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppTheme.cyan.withValues(alpha: 0.3)),
                 ),
                 child: const Icon(Icons.tune, size: 18, color: AppTheme.cyan),
               ),
@@ -765,8 +920,10 @@ class _ClipInspectorSheetState extends State<_ClipInspectorSheet> {
           ),
           const SizedBox(height: 18),
           // Audio Settings
-          Text('AUDIO GAIN (${_volumeDb.toStringAsFixed(1)} dB)',
-              style: AppTheme.labelSm.copyWith(color: AppTheme.pink)),
+          Text(
+            'AUDIO GAIN (${_volumeDb.toStringAsFixed(1)} dB)',
+            style: AppTheme.labelSm.copyWith(color: AppTheme.pink),
+          ),
           Row(
             children: [
               IconButton(
@@ -787,8 +944,10 @@ class _ClipInspectorSheetState extends State<_ClipInspectorSheet> {
           ),
           const SizedBox(height: 12),
           // Opacity
-          Text('OPACITY (${(_opacity * 100).toInt()}%)',
-              style: AppTheme.labelSm.copyWith(color: AppTheme.secondary)),
+          Text(
+            'OPACITY (${(_opacity * 100).toInt()}%)',
+            style: AppTheme.labelSm.copyWith(color: AppTheme.secondary),
+          ),
           Slider(
             value: _opacity,
             min: 0.0,
@@ -798,8 +957,10 @@ class _ClipInspectorSheetState extends State<_ClipInspectorSheet> {
           ),
           const SizedBox(height: 12),
           // Exposure
-          Text('EXPOSURE (${_exposure.toStringAsFixed(1)})',
-              style: AppTheme.labelSm.copyWith(color: AppTheme.warning)),
+          Text(
+            'EXPOSURE (${_exposure.toStringAsFixed(1)})',
+            style: AppTheme.labelSm.copyWith(color: AppTheme.warning),
+          ),
           Slider(
             value: _exposure,
             min: -2.0,

@@ -14,7 +14,7 @@ import 'package:parallax_mobile/config/theme.dart';
 import 'package:parallax_mobile/data/parallax_api.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({Key? key}) : super(key: key);
+  const SettingsScreen({super.key});
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -122,7 +122,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     runSpacing: 8,
                     children: [
                       _buildPresetChip('Localhost (8080)', 'http://localhost:8080'),
-                      _buildPresetChip('Android Emulator (10.0.2.2)', 'http://10.0.2.2:8080'),
+                      _buildPresetChip('Android (10.0.2.2:8080)', 'http://10.0.2.2:8080'),
+                      _buildPresetChip('LAN Host', 'http://192.168.1.100:8080'),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -201,7 +202,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             BlocBuilder<HealthBloc, HealthState>(
               builder: (context, state) {
                 if (state is HealthLoading || state is HealthInitial) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const Center(child: CircularProgressIndicator(color: AppTheme.primary));
                 } else if (state is HealthError) {
                   return Container(
                     decoration: BoxDecoration(
@@ -230,14 +231,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       color: AppTheme.cardDark,
                       borderRadius: BorderRadius.circular(18),
                       border: Border.all(color: AppTheme.borderSubtle),
+                      boxShadow: AppTheme.shadowSm,
                     ),
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       children: [
-                        _buildDiagRow('Server Status', 'ONLINE • 14ms', AppTheme.success),
-                        _buildDiagRow('Active LLM Agent', health.model, Colors.white),
+                        _buildDiagRow('Server Status', 'ONLINE • ACTIVE', AppTheme.success),
+                        _buildDiagRow('Active LLM Agent', health.model.isNotEmpty ? health.model : 'gemini-2.0-flash', Colors.white),
                         _buildDiagRow('API Base URL', health.baseUrl, const Color(0xFF94A3B8)),
-                        _buildDiagRow('Workspace Directory', health.workspace, const Color(0xFF94A3B8)),
+                        _buildDiagRow('Workspace Directory', health.workspace.isNotEmpty ? health.workspace : 'Local Storage', const Color(0xFF94A3B8)),
                         _buildDiagRow(
                           'Transcription Queue',
                           '${health.indexQueueDepth} pending',
