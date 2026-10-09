@@ -29,6 +29,7 @@ import 'package:parallax_mobile/data/models.dart';
 import 'package:parallax_mobile/widgets/director_trace_card.dart';
 import 'package:parallax_mobile/widgets/media_preview_modal.dart';
 import 'package:parallax_mobile/widgets/timeline_track_view.dart';
+import 'package:parallax_mobile/widgets/motion.dart';
 
 /// Pro Studio Project Workspace Screen housing Director AI, Media Bin with GIF Search, Timeline, History, & Export
 class ProjectWorkspaceScreen extends StatefulWidget {
@@ -125,7 +126,15 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    // When a Director run finishes, reload the timeline and history so the
+    // edits it made show up without a manual refresh.
+    return BlocListener<DirectorBloc, DirectorState>(
+      listenWhen: (prev, curr) => prev.isStreaming && !curr.isStreaming,
+      listener: (context, _) {
+        context.read<TimelineBloc>().add(const TimelineLoadRequested());
+        context.read<HistoryBloc>().add(const HistoryLoadRequested());
+      },
+      child: Scaffold(
       backgroundColor: AppTheme.bgDark,
       appBar: AppBar(
         backgroundColor: AppTheme.surfaceDark.withValues(alpha: 0.95),
@@ -243,6 +252,7 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
           ],
         ),
       ),
+    ),
     );
   }
 
@@ -1052,8 +1062,7 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
                 const SizedBox(height: 8),
 
                 if (mediaState is MediaLoading || mediaState is MediaInitial)
-                  const Center(
-                      child: CircularProgressIndicator(color: AppTheme.cyan))
+                  const CardGridSkeleton(count: 6)
                 else if (filteredAssets.isEmpty)
                   Center(
                     child: Padding(
@@ -1087,8 +1096,11 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
                       childAspectRatio: 0.84,
                     ),
                     itemCount: filteredAssets.length,
-                    itemBuilder: (context, index) =>
-                        _buildMediaAssetCard(context, filteredAssets[index]),
+                    itemBuilder: (context, index) => StaggeredEntrance(
+                      index: index,
+                      child:
+                          _buildMediaAssetCard(context, filteredAssets[index]),
+                    ),
                   ),
               ],
             ],
@@ -1280,8 +1292,7 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
     return BlocBuilder<TimelineBloc, TimelineState>(
       builder: (context, state) {
         if (state is TimelineLoading || state is TimelineInitial) {
-          return const Center(
-              child: CircularProgressIndicator(color: AppTheme.primary));
+          return const ListSkeleton(rows: 5, rowHeight: 48);
         }
         if (state is TimelineError) {
           return Center(
@@ -1333,8 +1344,7 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
     return BlocBuilder<HistoryBloc, HistoryState>(
       builder: (context, state) {
         if (state is HistoryLoading || state is HistoryInitial) {
-          return const Center(
-              child: CircularProgressIndicator(color: AppTheme.primary));
+          return const ListSkeleton();
         }
         if (state is HistoryError) {
           return Center(child: Text('History error: ${state.message}'));
@@ -1424,80 +1434,87 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
                             final rev = history.revisions[index];
                             final isCurrent = rev.id == history.currentRevision;
 
-                            return Container(
-                              margin: const EdgeInsets.symmetric(vertical: 5),
-                              decoration: BoxDecoration(
-                                color: AppTheme.cardDark,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: isCurrent
-                                      ? AppTheme.primary
-                                      : AppTheme.borderSubtle,
-                                  width: isCurrent ? 1.8 : 1.0,
-                                ),
-                                boxShadow: isCurrent
-                                    ? AppTheme.shadowGlowPrimary
-                                    : null,
-                              ),
-                              child: ListTile(
-                                leading: Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: (isCurrent
-                                            ? AppTheme.primary
-                                            : AppTheme.surfaceDark2)
-                                        .withValues(alpha: 0.25),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    isCurrent ? Icons.check : Icons.history,
-                                    size: 16,
+                            return StaggeredEntrance(
+                              index: index,
+                              child: Container(
+                                margin: const EdgeInsets.symmetric(vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.cardDark,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
                                     color: isCurrent
                                         ? AppTheme.primary
-                                        : Colors.grey,
+                                        : AppTheme.borderSubtle,
+                                    width: isCurrent ? 1.8 : 1.0,
                                   ),
+                                  boxShadow: isCurrent
+                                      ? AppTheme.shadowGlowPrimary
+                                      : null,
                                 ),
-                                title: Text(rev.message,
-                                    style: AppTheme.headingSm
-                                        .copyWith(fontSize: 12)),
-                                subtitle: Text(
-                                  DateFormat('MMM d, HH:mm:ss')
-                                      .format(rev.timestamp),
-                                  style: AppTheme.bodySm.copyWith(fontSize: 10),
-                                ),
-                                trailing: rev.checkpoint != null
-                                    ? Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 8, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          gradient: AppTheme.primaryGradient,
-                                          borderRadius:
-                                              BorderRadius.circular(6),
-                                        ),
-                                        child: Text(
-                                          rev.checkpoint!,
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 9,
-                                            fontWeight: FontWeight.w700,
+                                child: ListTile(
+                                  leading: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: (isCurrent
+                                              ? AppTheme.primary
+                                              : AppTheme.surfaceDark2)
+                                          .withValues(alpha: 0.25),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      isCurrent ? Icons.check : Icons.history,
+                                      size: 16,
+                                      color: isCurrent
+                                          ? AppTheme.primary
+                                          : Colors.grey,
+                                    ),
+                                  ),
+                                  title: Text(rev.message,
+                                      style: AppTheme.headingSm
+                                          .copyWith(fontSize: 12)),
+                                  subtitle: Text(
+                                    DateFormat('MMM d, HH:mm:ss')
+                                        .format(rev.timestamp),
+                                    style:
+                                        AppTheme.bodySm.copyWith(fontSize: 10),
+                                  ),
+                                  trailing: rev.checkpoint != null
+                                      ? Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            gradient: AppTheme.primaryGradient,
+                                            borderRadius:
+                                                BorderRadius.circular(6),
                                           ),
-                                        ),
-                                      )
-                                    : (!isCurrent
-                                        ? TextButton(
-                                            child: const Text('Restore',
-                                                style: TextStyle(fontSize: 11)),
-                                            onPressed: () {
-                                              context.read<HistoryBloc>().add(
-                                                    HistoryRestoreRequested(
-                                                        rev.id),
-                                                  );
-                                              context.read<TimelineBloc>().add(
-                                                    const TimelineRefreshRequested(),
-                                                  );
-                                            },
-                                          )
-                                        : null),
+                                          child: Text(
+                                            rev.checkpoint!,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        )
+                                      : (!isCurrent
+                                          ? TextButton(
+                                              child: const Text('Restore',
+                                                  style:
+                                                      TextStyle(fontSize: 11)),
+                                              onPressed: () {
+                                                context.read<HistoryBloc>().add(
+                                                      HistoryRestoreRequested(
+                                                          rev.id),
+                                                    );
+                                                context
+                                                    .read<TimelineBloc>()
+                                                    .add(
+                                                      const TimelineRefreshRequested(),
+                                                    );
+                                              },
+                                            )
+                                          : null),
+                                ),
                               ),
                             );
                           },
@@ -1573,11 +1590,14 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
                   style: AppTheme.labelSm
                       .copyWith(color: AppTheme.cyan, letterSpacing: 0.8)),
               const SizedBox(height: 8),
-              SegmentedButton<String>(
+              SingleChildScrollView(
+ scrollDirection: Axis.horizontal,
+ child: SegmentedButton<String>(
+                showSelectedIcon: false,
                 segments: const [
                   ButtonSegment(value: 'mp4', label: Text('MP4')),
                   ButtonSegment(value: 'mov', label: Text('MOV')),
-                  ButtonSegment(value: 'webm', label: Text('WebM')),
+                  ButtonSegment(value: 'webm', label: Text('WEBM')),
                   ButtonSegment(value: 'gif', label: Text('GIF')),
                   ButtonSegment(value: 'mp3', label: Text('MP3')),
                 ],
@@ -1586,6 +1606,7 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
                     .read<ExportBloc>()
                     .add(ExportFormatChanged(set.first)),
               ),
+ ),
               const SizedBox(height: 18),
 
               // Resolution Segmented Pills
@@ -1593,11 +1614,14 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
                   style: AppTheme.labelSm
                       .copyWith(color: AppTheme.secondary, letterSpacing: 0.8)),
               const SizedBox(height: 8),
-              SegmentedButton<String>(
+              SingleChildScrollView(
+ scrollDirection: Axis.horizontal,
+ child: SegmentedButton<String>(
+                showSelectedIcon: false,
                 segments: const [
-                  ButtonSegment(value: '1080p', label: Text('1080p FHD')),
-                  ButtonSegment(value: '720p', label: Text('720p HD')),
-                  ButtonSegment(value: '4k', label: Text('4K UHD')),
+                  ButtonSegment(value: '1080p', label: Text('1080p')),
+                  ButtonSegment(value: '720p', label: Text('720p')),
+                  ButtonSegment(value: '4k', label: Text('4K')),
                   ButtonSegment(value: 'source', label: Text('Source')),
                 ],
                 selected: {state.resolution},
@@ -1605,6 +1629,7 @@ class _ProjectWorkspaceScreenState extends State<ProjectWorkspaceScreen> {
                     .read<ExportBloc>()
                     .add(ExportResolutionChanged(set.first)),
               ),
+ ),
               const SizedBox(height: 18),
 
               // Framerate

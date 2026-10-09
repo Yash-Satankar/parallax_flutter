@@ -131,7 +131,7 @@ class _DirectorTraceCardState extends State<DirectorTraceCard> {
                               Text(
                                 act.name!,
                                 style: const TextStyle(
-                                  fontFamily: 'monospace',
+                                  fontFamily: 'JetBrainsMono',
                                   fontSize: 10,
                                   color: AppTheme.cyan,
                                   fontWeight: FontWeight.w600,
@@ -254,7 +254,7 @@ class _DirectorTraceCardState extends State<DirectorTraceCard> {
                             ? act.arguments as String
                             : const JsonEncoder.withIndent('  ').convert(act.arguments),
                         style: const TextStyle(
-                          fontFamily: 'monospace',
+                          fontFamily: 'JetBrainsMono',
                           fontSize: 10,
                           color: Color(0xFFE2E8F0),
                         ),
@@ -318,7 +318,7 @@ class _DirectorTraceCardState extends State<DirectorTraceCard> {
                       child: SelectableText(
                         act.detail!,
                         style: TextStyle(
-                          fontFamily: 'monospace',
+                          fontFamily: 'JetBrainsMono',
                           fontSize: 10,
                           color: act.status == 'error' ? const Color(0xFFFCA5A5) : const Color(0xFF94A3B8),
                         ),

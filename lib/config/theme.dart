@@ -148,6 +148,13 @@ class AppTheme {
   static final darkTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
+    fontFamily: 'Inter',
+    pageTransitionsTheme: const PageTransitionsTheme(
+      builders: {
+        TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
+        TargetPlatform.linux: FadeForwardsPageTransitionsBuilder(),
+      },
+    ),
     colorScheme: const ColorScheme.dark(
       primary: primary,
       secondary: secondary,
@@ -391,7 +398,7 @@ class AppTheme {
   );
 
   static const monospaceCode = TextStyle(
-    fontFamily: 'monospace',
+    fontFamily: 'JetBrainsMono',
     fontSize: 12,
     fontWeight: FontWeight.w600,
     color: cyan,
@@ -399,7 +406,7 @@ class AppTheme {
   );
 
   static const timecodeLarge = TextStyle(
-    fontFamily: 'monospace',
+    fontFamily: 'JetBrainsMono',
     fontSize: 15,
     fontWeight: FontWeight.w700,
     color: cyan,

@@ -11,6 +11,7 @@ import 'package:parallax_mobile/blocs/settings/settings_bloc.dart';
 import 'package:parallax_mobile/blocs/settings/settings_event.dart';
 import 'package:parallax_mobile/blocs/settings/settings_state.dart';
 import 'package:parallax_mobile/config/theme.dart';
+import 'package:parallax_mobile/demo/demo_config.dart';
 import 'package:parallax_mobile/data/parallax_api.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -327,7 +328,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                           child: Text(
                                             profile.model,
                                             style: const TextStyle(
-                                              fontFamily: 'monospace',
+                                              fontFamily: 'JetBrainsMono',
                                               fontSize: 9,
                                               color: AppTheme.cyan,
                                             ),
@@ -383,6 +384,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 return const SizedBox.shrink();
               },
             ),
+            const SizedBox(height: 32),
+            Center(
+              child: Column(
+                children: [
+                  Text(
+                    'Parallax Studio · mobile',
+                    style: AppTheme.labelSm.copyWith(color: const Color(0xFF94A3B8)),
+                  ),
+                  if (kDemoMode) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      kDemoDisclaimer,
+                      style: AppTheme.labelSm.copyWith(color: const Color(0xFF64748B)),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
           ],
         ),
       ),

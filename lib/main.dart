@@ -12,6 +12,8 @@ import 'package:parallax_mobile/blocs/settings/settings_event.dart';
 import 'package:parallax_mobile/config/router.dart';
 import 'package:parallax_mobile/config/theme.dart';
 import 'package:parallax_mobile/data/parallax_api.dart';
+import 'package:parallax_mobile/demo/demo_backend.dart';
+import 'package:parallax_mobile/demo/demo_config.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,7 +34,9 @@ class _ParallaxAppState extends State<ParallaxApp> {
   @override
   void initState() {
     super.initState();
-    final baseUrl = !kIsWeb && defaultTargetPlatform == TargetPlatform.android
+    final baseUrl = kDemoMode
+        ? kDemoBaseUrl
+        : !kIsWeb && defaultTargetPlatform == TargetPlatform.android
         ? 'http://10.0.2.2:8080'
         : 'http://localhost:8080';
 
@@ -43,6 +47,9 @@ class _ParallaxAppState extends State<ParallaxApp> {
       sendTimeout: const Duration(seconds: 60),
       headers: {'Accept': 'application/json'},
     ));
+
+    // Demo builds: serve every endpoint offline from seeded sample data.
+    if (kDemoMode) dio.httpClientAdapter = DemoBackendAdapter();
 
     _serverCubit = ServerCubit();
     _api = ParallaxApi(dio, baseUrl: baseUrl);

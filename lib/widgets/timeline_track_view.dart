@@ -1,3 +1,4 @@
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/material.dart';
 import 'package:parallax_mobile/config/theme.dart';
 import 'package:parallax_mobile/data/models.dart';
@@ -17,12 +18,63 @@ class TimelineTrackView extends StatefulWidget {
   State<TimelineTrackView> createState() => _TimelineTrackViewState();
 }
 
-class _TimelineTrackViewState extends State<TimelineTrackView> {
+class _TimelineTrackViewState extends State<TimelineTrackView>
+    with SingleTickerProviderStateMixin {
   double _zoom = 36.0; // pixels per second
   double _playhead = 0.0; // current playhead in seconds
   bool _isPlaying = false;
   final ScrollController _scrollController = ScrollController();
   String? _selectedClipId;
+
+  // Advances the playhead in real time while playing (preview scrub only).
+  late final Ticker _ticker = createTicker(_onTick);
+  Duration _lastTick = Duration.zero;
+
+  double get _totalDuration =>
+      widget.timeline.duration > 0 ? widget.timeline.duration : 45.0;
+
+  void _onTick(Duration elapsed) {
+    final dt = (elapsed - _lastTick).inMicroseconds / 1e6;
+    _lastTick = elapsed;
+    setState(() {
+      _playhead += dt;
+      if (_playhead >= _totalDuration) {
+        _playhead = _totalDuration;
+        _setPlaying(false);
+      }
+    });
+    _followPlayhead();
+  }
+
+  void _followPlayhead() {
+    if (!_scrollController.hasClients) return;
+    final x = _playhead * _zoom;
+    final pos = _scrollController.position;
+    final view = pos.viewportDimension;
+    if (x > pos.pixels + view * 0.8 || x < pos.pixels) {
+      _scrollController.jumpTo(
+        (x - view * 0.2).clamp(0.0, pos.maxScrollExtent),
+      );
+    }
+  }
+
+  void _setPlaying(bool playing) {
+    _isPlaying = playing;
+    if (playing) {
+      if (_playhead >= _totalDuration) _playhead = 0;
+      _lastTick = Duration.zero;
+      if (!_ticker.isActive) _ticker.start();
+    } else if (_ticker.isActive) {
+      _ticker.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    _ticker.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   Color _parseColor(String? colorString) {
     if (colorString == null || colorString.isEmpty) return AppTheme.cyan;
@@ -242,7 +294,12 @@ class _TimelineTrackViewState extends State<TimelineTrackView> {
           child: Row(
             children: [
               // Digital Timecode Display HUD
-              Container(
+              Flexible(
+                flex: 6,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   color: AppTheme.bgDark,
@@ -261,12 +318,14 @@ class _TimelineTrackViewState extends State<TimelineTrackView> {
                     Text(
                       ' / ${FormatUtils.formatTimecode(totalDuration)}',
                       style: const TextStyle(
-                        fontFamily: 'monospace',
+                        fontFamily: 'JetBrainsMono',
                         color: Color(0xFF64748B),
                         fontSize: 11,
                       ),
                     ),
                   ],
+                ),
+              ),
                 ),
               ),
               const SizedBox(width: 8),
@@ -291,10 +350,10 @@ class _TimelineTrackViewState extends State<TimelineTrackView> {
                   });
                 },
                 padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
               ),
               SizedBox(
-                width: 70,
+                width: 64,
                 child: SliderTheme(
                   data: SliderTheme.of(context).copyWith(
                     thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
@@ -319,7 +378,7 @@ class _TimelineTrackViewState extends State<TimelineTrackView> {
                   });
                 },
                 padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
               ),
             ],
           ),
@@ -639,7 +698,7 @@ class _TimelineTrackViewState extends State<TimelineTrackView> {
               // Play/Pause Trigger
               InkWell(
                 borderRadius: BorderRadius.circular(10),
-                onTap: () => setState(() => _isPlaying = !_isPlaying),
+                onTap: () => setState(() => _setPlaying(!_isPlaying)),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   decoration: BoxDecoration(
@@ -755,7 +814,7 @@ class _RulerPainter extends CustomPainter {
       textPainter.text = TextSpan(
         text: '${sec}s',
         style: const TextStyle(
-          fontFamily: 'monospace',
+          fontFamily: 'JetBrainsMono',
           color: Color(0xFF94A3B8),
           fontSize: 9,
           fontWeight: FontWeight.w600,
